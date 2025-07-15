@@ -135,14 +135,14 @@ cache.read # => { "preferences" => "dark" }
 
 ## Metrics
 
-Track cache effectiveness:
+Track cache effectiveness and performance:
 
 ```ruby
 Mudis.metrics
 # => { hits: 15, misses: 5, evictions: 3 }
 ```
 
-Optionally, return these metrics from a controller for remote analysis and monitoring.
+Optionally, return these metrics from a controller for remote analysis and monitoring if using rails.
 
 ```ruby
 class MudisController < ApplicationController
@@ -215,10 +215,10 @@ MIT License © kiebor81
 PRs are welcome! To get started:
 
 ```bash
-git clone https://github.com/yourusername/mudis
+git clone https://github.com/kiebor81/mudis
 cd mudis
 bundle install
-rspec
+
 ```
 
 ---
