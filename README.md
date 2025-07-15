@@ -4,6 +4,8 @@
 
 It’s ideal for scenarios where performance and process-local caching are critical, and where a full Redis setup is overkill or otherwise not possible.
 
+Alternatively, Mudis can be upscaled with higher sharding and resources in a dedicated rails app to provide a Mudis server.
+
 ---
 
 ## Design
@@ -91,7 +93,7 @@ Mudis.delete('user:123')
 
 ## Rails Service Integration
 
-For simplified or transient use in a controller, you can wrap your cache logic in a reusable thin class:
+For simplified or transient use in a controller, you can wrap your cache logic in a reusable thin class (TODO: add more useful abstraction once DSL and namespacing is introduced):
 
 ```ruby
 class MudisService
