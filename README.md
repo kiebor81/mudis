@@ -128,7 +128,7 @@ end
 Use it like:
 
 ```ruby
-cache = MudisCacheService.new("user:#{current_user.id}")
+cache = MudisService.new("user:#{current_user.id}")
 cache.write({ preferences: "dark" }, expires_in: 3600)
 cache.read # => { "preferences" => "dark" }
 ```
