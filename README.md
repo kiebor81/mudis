@@ -190,7 +190,7 @@ at_exit { Mudis.stop_expiry_thread }
 
 ## Known Limitations
 
-- Data is **process-local** and **non-persistent**.
+- Data is **process-local** and **non-persistent** (doesn't survive a shutdown).
 - Not suitable for cross-process or cross-language use.
 - Keys are globally scoped (no namespacing by default).
 - Compression introduces CPU overhead.
