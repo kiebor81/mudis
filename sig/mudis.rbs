@@ -1,4 +1,4 @@
+# sig/mudis.rb
 module Mudis
-  VERSION: String
-  # See the writing guide of rbs: https://github.com/ruby/rbs#guides
+  VERSION = "0.1.0"
 end

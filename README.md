@@ -1,39 +1,198 @@
 # Mudis
 
-TODO: Delete this and the text below, and describe your gem
+**Mudis** is a fast, thread-safe, in-memory, sharded LRU (Least Recently Used) cache for Ruby applications. Inspired by Redis, it provides value serialization, optional compression, per-key expiry, and metric tracking — all in a lightweight, dependency-free package that lives inside your Ruby process.
 
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/mudis`. To experiment with that code, run `bin/console` for an interactive prompt.
+It’s ideal for scenarios where performance and process-local caching are critical, and where a full Redis setup is overkill or otherwise not possible.
+
+---
+
+## Features
+
+- **Thread-safe**: Uses per-bucket mutexes for high concurrency.
+- **Sharded**: Buckets data across multiple internal stores to minimize lock contention.
+- **LRU Eviction**: Automatically evicts least recently used items as memory fills up.
+- **Expiry Support**: Optional TTL per key with background cleanup thread.
+- **Compression**: Optional Zlib compression for large values.
+- **Metrics**: Tracks hits, misses, and evictions.
+
+---
 
 ## Installation
 
-TODO: Replace `UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG` with your gem name right after releasing it to RubyGems.org. Please do not do it earlier due to security reasons. Alternatively, replace this section with instructions to install your gem from git if you don't plan to release to RubyGems.org.
+Add this line to your Gemfile:
 
-Install the gem and add to the application's Gemfile by executing:
+```ruby
+gem 'mudis'
+```
 
-    $ bundle add UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG
+Or install it manually:
 
-If bundler is not being used to manage dependencies, install the gem by executing:
+```bash
+gem install mudis
+```
 
-    $ gem install UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG
+---
 
-## Usage
+## Configuration (Rails)
 
-TODO: Write usage instructions here
+In your Rails app, create an initializer:
 
-## Development
+```ruby
+# config/initializers/mudis.rb
 
-After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
+Mudis.serializer = JSON        # or Marshal | Oj
+Mudis.compress = true          # Compress values using Zlib
+Mudis.max_value_bytes = 2_000_000  # Reject values > 2MB
+Mudis.start_expiry_thread(interval: 60) # Cleanup every 60s
 
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and the created tag, and push the `.gem` file to [rubygems.org](https://rubygems.org).
+at_exit do
+  Mudis.stop_expiry_thread
+end
+```
 
-## Contributing
+> If your `lib/` folder isn't eager loaded, explicitly `require 'mudis'` in this file.
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/[USERNAME]/mudis. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [code of conduct](https://github.com/[USERNAME]/mudis/blob/master/CODE_OF_CONDUCT.md).
+---
+
+## Basic Usage
+
+```ruby
+require 'mudis'
+
+# Write a value with optional TTL
+Mudis.write('user:123', { name: 'Alice' }, expires_in: 600)
+
+# Read it back
+Mudis.read('user:123') # => { "name" => "Alice" }
+
+# Check if it exists
+Mudis.exists?('user:123') # => true
+
+# Atomically update
+Mudis.update('user:123') { |data| data.merge(age: 30) }
+
+# Delete a key
+Mudis.delete('user:123')
+```
+
+---
+
+## Rails Service Integration
+
+For simplified or ytransient use in a controller, you can wrap your cache logic in a reusable thin class:
+
+```ruby
+class MudisCacheService
+  attr_reader :cache_key
+
+  def initialize(cache_key)
+    @cache_key = cache_key
+  end
+
+  def write(data, expires_in: nil)
+    Mudis.write(cache_key, data, expires_in: expires_in)
+  end
+
+  def read(default: nil)
+    Mudis.read(cache_key) || default
+  end
+
+  def update
+    Mudis.update(cache_key) { |current| yield(current) }
+  end
+
+  def delete
+    Mudis.delete(cache_key)
+  end
+
+  def exists?
+    Mudis.exists?(cache_key)
+  end
+end
+```
+
+Use it like:
+
+```ruby
+cache = MudisCacheService.new("user:#{current_user.id}")
+cache.write({ preferences: "dark" }, expires_in: 3600)
+cache.read # => { "preferences" => "dark" }
+```
+
+---
+
+## Metrics
+
+Track cache effectiveness:
+
+```ruby
+Mudis.metrics
+# => { hits: 15, misses: 5, evictions: 3 }
+```
+
+---
+
+## Advanced Configuration
+
+| Setting                  | Description                                 | Default            |
+|--------------------------|---------------------------------------------|--------------------|
+| `Mudis.serializer`       | JSON, Marshal, or Oj                        | `JSON`             |
+| `Mudis.compress`         | Enable Zlib compression                     | `false`            |
+| `Mudis.max_value_bytes`  | Max allowed size in bytes for a value       | `nil` (no limit)   |
+| `Mudis.buckets`          | Number of cache shards (via ENV var)        | `32`               |
+| `start_expiry_thread`    | Background TTL cleanup loop (every N sec)   | Disabled by default|
+
+To customize the number of buckets, set the `MUDIS_BUCKETS` environment variable.
+
+---
+
+## Graceful Shutdown
+
+Don’t forget to stop the expiry thread when your app exits:
+
+```ruby
+at_exit { Mudis.stop_expiry_thread }
+```
+
+---
+
+## Known Limitations
+
+- Data is **process-local** and **non-persistent**.
+- Not suitable for cross-process or cross-language use.
+- Keys are globally scoped (no namespacing by default).
+- Compression introduces CPU overhead.
+
+---
+
+## Roadmap
+
+- [ ] Namespaced cache keys
+- [ ] Stats per bucket
+- [ ] Optional max memory cap per bucket
+- [ ] Built-in fetch/read-or-write DSL
+
+---
 
 ## License
 
-The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
+MIT License © kiebor81
 
-## Code of Conduct
+---
 
-Everyone interacting in the Mudis project's codebases, issue trackers, chat rooms and mailing lists is expected to follow the [code of conduct](https://github.com/[USERNAME]/mudis/blob/master/CODE_OF_CONDUCT.md).
+## Contributing
+
+PRs are welcome! To get started:
+
+```bash
+git clone https://github.com/yourusername/mudis
+cd mudis
+bundle install
+rspec
+```
+
+---
+
+## Contact
+
+For issues, suggestions, or feedback, please open a GitHub issue
