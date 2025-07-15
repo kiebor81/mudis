@@ -4,7 +4,7 @@ require_relative "lib/mudis/version"
 
 Gem::Specification.new do |spec|
   spec.name          = "mudis"
-  spec.version       = Mudis::VERSION
+  spec.version       = MUDIS_VERSION
   spec.authors       = ["kiebor81"]
 
   spec.summary       = "A fast in-memory Ruby LRU cache with compression and expiry."
@@ -12,6 +12,7 @@ Gem::Specification.new do |spec|
   spec.homepage      = "https://github.com/kiebor81/mudis"
   spec.license       = "MIT"
 
+  spec.extra_rdoc_files += Dir["sig/**/*.rbs"]
   spec.files         = Dir["lib/**/*", "README.md"]
   spec.require_paths = ["lib"]
   spec.test_files = Dir["spec/**/*_spec.rb"]

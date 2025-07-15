@@ -1,4 +1,28 @@
-# sig/mudis.rb
-module Mudis
-  VERSION = "0.1.0"
+# sig/mudis.rbs
+
+class Mudis
+  # Configuration
+  class << self
+    attr_accessor serializer : Object
+    attr_accessor compress : bool
+    attr_accessor max_value_bytes : Integer?
+  end
+
+  # Lifecycle
+  def self.start_expiry_thread: (?interval: Integer) -> void
+  def self.stop_expiry_thread: () -> void
+
+  # Core operations
+  def self.write: (String, untyped, ?expires_in: Integer) -> void
+  def self.read: (String) -> untyped?
+  def self.update: (String) { (untyped) -> untyped } -> void
+  def self.delete: (String) -> void
+  def self.exists?: (String) -> bool
+
+  # Introspection & management
+  def self.metrics: () -> Hash[Symbol, Integer]
+  def self.cleanup_expired!: () -> void
+  def self.all_keys: () -> Array[String]
+  def self.current_memory_bytes: () -> Integer
+  def self.max_memory_bytes: () -> Integer
 end
