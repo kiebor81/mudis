@@ -1,8 +1,20 @@
-# Mudis
+![mudis_signet](design/mudis.png "Mudis")
 
-**Mudis** is a fast, thread-safe, in-memory, sharded LRU (Least Recently Used) cache for Ruby applications. Inspired by Redis, it provides value serialization, optional compression, per-key expiry, and metric tracking — all in a lightweight, dependency-free package that lives inside your Ruby process.
+**Mudis** is a fast, thread-safe, in-memory, sharded LRU (Least Recently Used) cache for Ruby applications. Inspired by Redis, it provides value serialization, optional compression, per-key expiry, and metric tracking in a lightweight, dependency-free package that lives inside your Ruby process.
 
 It’s ideal for scenarios where performance and process-local caching are critical, and where a full Redis setup is overkill or otherwise not possible.
+
+---
+
+## Design
+
+#### Write - Read - Eviction
+
+![mudis_flow](design/mudis_flow.png "Write - Read - Eviction")
+
+#### Cache Key Lifecycle
+
+![mudis_lru](design/mudis_lru.png "Mudis Cache Key Lifecycle")
 
 ---
 
@@ -79,10 +91,10 @@ Mudis.delete('user:123')
 
 ## Rails Service Integration
 
-For simplified or ytransient use in a controller, you can wrap your cache logic in a reusable thin class:
+For simplified or transient use in a controller, you can wrap your cache logic in a reusable thin class:
 
 ```ruby
-class MudisCacheService
+class MudisService
   attr_reader :cache_key
 
   def initialize(cache_key)
@@ -128,6 +140,24 @@ Track cache effectiveness:
 ```ruby
 Mudis.metrics
 # => { hits: 15, misses: 5, evictions: 3 }
+```
+
+Optionally, return these metrics from a controller for remote analysis and monitoring.
+
+```ruby
+class MudisController < ApplicationController
+
+  def metrics
+    render json: {
+      mudis_metrics: Mudis.metrics,
+      memory_used_bytes: Mudis.current_memory_bytes,
+      memory_max_bytes: Mudis.max_memory_bytes,
+      keys: Mudis.all_keys.size
+    }
+  end
+
+end
+
 ```
 
 ---
