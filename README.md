@@ -21,7 +21,7 @@ There are plenty out there, in various states of maintenance and in many shapes 
 
 #### Feature / Function Comparison
 
-| **Feature**                            | **Mudis v0.3.0** | **MemoryStore** (`Rails.cache`) | **FastCache**  | **Zache**     | **EasyCache** | **MiniCache**  |
+| **Feature**                            | **Mudis** | **MemoryStore** (`Rails.cache`) | **FastCache**  | **Zache**     | **EasyCache** | **MiniCache**  |
 | -------------------------------------- | ---------------- | ------------------------------- | -------------- | ------------- | ------------- | -------------- |
 | **LRU eviction strategy**              | ✅ Per-bucket     | ✅ Global                        | ✅ Global       | ❌             | ❌             | ✅ Simplistic   |
 | **TTL expiry support**                 | ✅                | ✅                               | ✅              | ✅             | ✅             | ✅              |
