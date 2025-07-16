@@ -60,6 +60,7 @@ Mudis.serializer = JSON        # or Marshal | Oj
 Mudis.compress = true          # Compress values using Zlib
 Mudis.max_value_bytes = 2_000_000  # Reject values > 2MB
 Mudis.start_expiry_thread(interval: 60) # Cleanup every 60s
+Mudis.hard_memory_limit = true # enforce hard memory limits
 
 at_exit do
   Mudis.stop_expiry_thread
@@ -95,44 +96,87 @@ Mudis.delete('user:123')
 
 ## Rails Service Integration
 
-For simplified or transient use in a controller, you can wrap your cache logic in a reusable thin class (TODO: add more useful abstraction once DSL and namespacing is introduced):
+For simplified or transient use in a controller, you can wrap your cache logic in a reusable thin class:
 
 ```ruby
 class MudisService
-  attr_reader :cache_key
+  attr_reader :cache_key, :namespace
 
-  def initialize(cache_key)
+  # Initialize the service with a cache key and optional namespace
+  #
+  # @param cache_key [String] the base key to use
+  # @param namespace [String, nil] optional logical namespace
+  def initialize(cache_key, namespace: nil)
     @cache_key = cache_key
+    @namespace = namespace
   end
 
+  # Write a value to the cache
+  #
+  # @param data [Object] the value to cache
+  # @param expires_in [Integer, nil] optional TTL in seconds
   def write(data, expires_in: nil)
-    Mudis.write(cache_key, data, expires_in: expires_in)
+    Mudis.write(cache_key, data, expires_in: expires_in, namespace: namespace)
   end
 
+  # Read the cached value or return default
+  #
+  # @param default [Object] fallback value if key is not present
   def read(default: nil)
-    Mudis.read(cache_key) || default
+    Mudis.read(cache_key, namespace: namespace) || default
   end
 
+  # Update the cached value using a block
+  #
+  # @yieldparam current [Object] the current value
+  # @yieldreturn [Object] the updated value
   def update
-    Mudis.update(cache_key) { |current| yield(current) }
+    Mudis.update(cache_key, namespace: namespace) { |current| yield(current) }
   end
 
+  # Delete the key from cache
   def delete
-    Mudis.delete(cache_key)
+    Mudis.delete(cache_key, namespace: namespace)
   end
 
+  # Return true if the key exists in cache
   def exists?
-    Mudis.exists?(cache_key)
+    Mudis.exists?(cache_key, namespace: namespace)
+  end
+
+  # Fetch from cache or compute and store it
+  #
+  # @param expires_in [Integer, nil] optional TTL
+  # @param force [Boolean] force recomputation
+  # @yield return value if key is missing
+  def fetch(expires_in: nil, force: false)
+    Mudis.fetch(cache_key, expires_in: expires_in, force: force, namespace: namespace) do
+      yield
+    end
+  end
+
+  # Inspect metadata for the current key
+  #
+  # @return [Hash, nil] metadata including :expires_at, :created_at, :size_bytes, etc.
+  def inspect_meta
+    Mudis.inspect(cache_key, namespace: namespace)
   end
 end
+
 ```
 
 Use it like:
 
 ```ruby
-cache = MudisService.new("user:#{current_user.id}")
-cache.write({ preferences: "dark" }, expires_in: 3600)
-cache.read # => { "preferences" => "dark" }
+cache = MudisService.new("user:42:profile", namespace: "users")
+
+cache.write({ name: "Alice" }, expires_in: 300)
+cache.read                       # => { "name" => "Alice" }
+cache.exists?                    # => true
+
+cache.update { |data| data.merge(age: 30) }
+cache.fetch(expires_in: 60) { expensive_query }
+cache.inspect_meta               # => { key: "users:user:42:profile", ... }
 ```
 
 ---
@@ -143,7 +187,7 @@ Track cache effectiveness and performance:
 
 ```ruby
 Mudis.metrics
-# => { hits: 15, misses: 5, evictions: 3 }
+# => { hits: 15, misses: 5, evictions: 3, rejections: 0 }
 ```
 
 Optionally, return these metrics from a controller for remote analysis and monitoring if using rails.
@@ -175,6 +219,7 @@ end
 | `Mudis.max_value_bytes`  | Max allowed size in bytes for a value       | `nil` (no limit)   |
 | `Mudis.buckets`          | Number of cache shards (via ENV var)        | `32`               |
 | `start_expiry_thread`    | Background TTL cleanup loop (every N sec)   | Disabled by default|
+| `hard_memory_limit `    | Enfirce hard memory limits on key size and reject if exceeded  | `false`|
 
 To customize the number of buckets, set the `MUDIS_BUCKETS` environment variable.
 
@@ -216,17 +261,13 @@ at_exit { Mudis.stop_expiry_thread }
 ## Known Limitations
 
 - Data is **non-persistent**.
-- Keys are globally scoped (no namespacing by default). 
-    - Namespacing must be handled by the caller/consumer using scoped keys.
 - Compression introduces CPU overhead.
 
 ---
 
 ## Roadmap
 
-- [ ] Namespaced cache keys
 - [ ] Stats per bucket
-- [ ] Optional max memory cap per bucket
 
 ---
 

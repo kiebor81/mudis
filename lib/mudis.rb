@@ -11,13 +11,13 @@ class Mudis # rubocop:disable Metrics/ClassLength
 
   @serializer = JSON                            # Default serializer (can be changed to Marshal or Oj)
   @compress = false                             # Whether to compress values with Zlib
-  @metrics = { hits: 0, misses: 0, evictions: 0 } # Metrics tracking read/write behavior
+  @metrics = { hits: 0, misses: 0, evictions: 0, rejected: 0 } # Metrics tracking read/write behaviour
   @metrics_mutex = Mutex.new                    # Mutex for synchronizing access to metrics
   @max_value_bytes = nil                        # Optional size cap per value
   @stop_expiry = false                          # Signal for stopping expiry thread
 
   class << self
-    attr_accessor :serializer, :compress, :max_value_bytes
+    attr_accessor :serializer, :compress, :max_value_bytes, :hard_memory_limit
 
     # Returns a snapshot of metrics (thread-safe)
     def metrics
@@ -52,6 +52,7 @@ class Mudis # rubocop:disable Metrics/ClassLength
   @max_bytes = 1_073_741_824                    # 1 GB global max cache size
   @threshold_bytes = (@max_bytes * 0.9).to_i # Eviction threshold at 90%
   @expiry_thread = nil # Background thread for expiry cleanup
+  @hard_memory_limit = false # Whether to enforce hard memory cap
 
   class << self
     # Starts a thread that periodically removes expired entries
@@ -82,12 +83,14 @@ class Mudis # rubocop:disable Metrics/ClassLength
     end
 
     # Checks if a key exists and is not expired
-    def exists?(key)
+    def exists?(key, namespace: nil)
+      key = namespaced_key(key, namespace)
       !!read(key)
     end
 
     # Reads and returns the value for a key, updating LRU and metrics
-    def read(key) # rubocop:disable Metrics/MethodLength
+    def read(key, namespace: nil) # rubocop:disable Metrics/MethodLength,Metrics/AbcSize
+      key = namespaced_key(key, namespace)
       raw_entry = nil
       idx = bucket_index(key)
       mutex = @mutexes[idx]
@@ -111,11 +114,17 @@ class Mudis # rubocop:disable Metrics/ClassLength
     end
 
     # Writes a value to the cache with optional expiry and LRU tracking
-    def write(key, value, expires_in: nil) # rubocop:disable Metrics/MethodLength,Metrics/CyclomaticComplexity,Metrics/AbcSize
+    def write(key, value, expires_in: nil, namespace: nil) # rubocop:disable Metrics/MethodLength,Metrics/CyclomaticComplexity,Metrics/AbcSize,Metrics/PerceivedComplexity
+      key = namespaced_key(key, namespace)
       raw = serializer.dump(value)
       raw = Zlib::Deflate.deflate(raw) if compress
       size = key.bytesize + raw.bytesize
       return if max_value_bytes && raw.bytesize > max_value_bytes
+
+      if hard_memory_limit && current_memory_bytes + size > max_memory_bytes
+        metric(:rejected)
+        return
+      end
 
       idx = bucket_index(key)
       mutex = @mutexes[idx]
@@ -141,7 +150,8 @@ class Mudis # rubocop:disable Metrics/ClassLength
     end
 
     # Atomically updates the value for a key using a block
-    def update(key) # rubocop:disable Metrics/AbcSize,Metrics/MethodLength
+    def update(key, namespace: nil) # rubocop:disable Metrics/AbcSize,Metrics/MethodLength
+      key = namespaced_key(key, namespace)
       idx = bucket_index(key)
       mutex = @mutexes[idx]
       store = @stores[idx]
@@ -167,7 +177,8 @@ class Mudis # rubocop:disable Metrics/ClassLength
     end
 
     # Deletes a key from the cache
-    def delete(key)
+    def delete(key, namespace: nil)
+      key = namespaced_key(key, namespace)
       idx = bucket_index(key)
       mutex = @mutexes[idx]
 
@@ -180,7 +191,8 @@ class Mudis # rubocop:disable Metrics/ClassLength
     # The block is executed to generate the value if it doesn't exist
     # Optionally accepts an expiration time
     # If force is true, it always fetches and writes the value
-    def fetch(key, expires_in: nil, force: false)
+    def fetch(key, expires_in: nil, force: false, namespace: nil)
+      key = namespaced_key(key, namespace)
       unless force
         cached = read(key)
         return cached if cached
@@ -194,22 +206,23 @@ class Mudis # rubocop:disable Metrics/ClassLength
     # Clears a specific key from the cache, a semantic synonym for delete
     # This method is provided for clarity in usage
     # It behaves the same as delete
-    def clear(key)
-      delete(key)
+    def clear(key, namespace: nil)
+      delete(key, namespace: namespace)
     end
 
     # Replaces the value for a key if it exists, otherwise does nothing
     # This is useful for updating values without needing to check existence first
     # It will write the new value and update the expiration if provided
     # If the key does not exist, it will not create a new entry
-    def replace(key, value, expires_in: nil)
-      return unless exists?(key)
+    def replace(key, value, expires_in: nil, namespace: nil)
+      return unless exists?(key, namespace: namespace)
 
-      write(key, value, expires_in: expires_in)
+      write(key, value, expires_in: expires_in, namespace: namespace)
     end
 
     # Inspects a key and returns all meta data for it
-    def inspect(key) # rubocop:disable Metrics/MethodLength
+    def inspect(key, namespace: nil) # rubocop:disable Metrics/MethodLength
+      key = namespaced_key(key, namespace)
       idx = bucket_index(key)
       store = @stores[idx]
       mutex = @mutexes[idx]
@@ -262,6 +275,15 @@ class Mudis # rubocop:disable Metrics/ClassLength
     # Returns configured maximum memory allowed
     def max_memory_bytes
       @max_bytes
+    end
+
+    # Executes a block with a specific namespace, restoring the old namespace afterwards
+    def with_namespace(namespace)
+      old_ns = Thread.current[:mudis_namespace]
+      Thread.current[:mudis_namespace] = namespace
+      yield
+    ensure
+      Thread.current[:mudis_namespace] = old_ns
     end
 
     private
@@ -321,6 +343,12 @@ class Mudis # rubocop:disable Metrics/ClassLength
       else
         @lru_tails[idx] = node.prev
       end
+    end
+
+    # Namespaces a key with an optional namespace
+    def namespaced_key(key, namespace = nil)
+      ns = namespace || Thread.current[:mudis_namespace]
+      ns ? "#{ns}:#{key}" : key
     end
   end
 end

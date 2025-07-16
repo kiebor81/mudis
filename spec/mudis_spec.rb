@@ -12,7 +12,7 @@ RSpec.describe Mudis do # rubocop:disable Metrics/BlockLength
     Mudis.instance_variable_set(:@lru_tails, Array.new(Mudis.buckets) { nil })
     Mudis.instance_variable_set(:@lru_nodes, Array.new(Mudis.buckets) { {} })
     Mudis.instance_variable_set(:@current_bytes, Array.new(Mudis.buckets, 0))
-    Mudis.instance_variable_set(:@metrics, { hits: 0, misses: 0, evictions: 0 })
+    Mudis.instance_variable_set(:@metrics, { hits: 0, misses: 0, evictions: 0, rejected: 0 })
     Mudis.serializer = JSON
     Mudis.compress = false
     Mudis.max_value_bytes = nil
@@ -114,6 +114,24 @@ RSpec.describe Mudis do # rubocop:disable Metrics/BlockLength
     end
   end
 
+  describe "namespacing" do
+    it "uses thread-local namespace in block" do
+      Mudis.with_namespace("test") do
+        Mudis.write("foo", "bar")
+      end
+      expect(Mudis.read("foo", namespace: "test")).to eq("bar")
+      expect(Mudis.read("foo")).to be_nil
+    end
+
+    it "supports explicit namespace override" do
+      Mudis.write("x", 1, namespace: "alpha")
+      Mudis.write("x", 2, namespace: "beta")
+      expect(Mudis.read("x", namespace: "alpha")).to eq(1)
+      expect(Mudis.read("x", namespace: "beta")).to eq(2)
+      expect(Mudis.read("x")).to be_nil
+    end
+  end
+
   describe "expiry handling" do
     it "expires values after specified time" do
       Mudis.write("short_lived", "gone soon", expires_in: 1)
@@ -133,6 +151,35 @@ RSpec.describe Mudis do # rubocop:disable Metrics/BlockLength
     end
   end
 
+  describe "memory guards" do
+    before do
+      Mudis.stop_expiry_thread
+      Mudis.instance_variable_set(:@buckets, 1)
+      Mudis.instance_variable_set(:@stores, [{}])
+      Mudis.instance_variable_set(:@mutexes, [Mutex.new])
+      Mudis.instance_variable_set(:@lru_heads, [nil])
+      Mudis.instance_variable_set(:@lru_tails, [nil])
+      Mudis.instance_variable_set(:@lru_nodes, [{}])
+      Mudis.instance_variable_set(:@current_bytes, [0])
+
+      Mudis.max_value_bytes = nil
+      Mudis.instance_variable_set(:@threshold_bytes, 1_000_000) # optional
+      Mudis.hard_memory_limit = true
+      Mudis.instance_variable_set(:@max_bytes, 100) # artificially low
+    end
+
+    it "rejects writes that exceed max memory" do
+      big_value = "a" * 90
+      Mudis.write("a", big_value)
+      expect(Mudis.read("a")).to eq(big_value)
+
+      big_value_2 = "b" * 90 # rubocop:disable Naming/VariableNumber
+      Mudis.write("b", big_value_2)
+      expect(Mudis.read("b")).to be_nil
+      expect(Mudis.metrics[:rejected]).to be > 0
+    end
+  end
+
   describe "LRU eviction" do
     it "evicts old entries when size limit is reached" do
       Mudis.stop_expiry_thread
@@ -145,7 +192,7 @@ RSpec.describe Mudis do # rubocop:disable Metrics/BlockLength
       Mudis.instance_variable_set(:@lru_tails, [nil])
       Mudis.instance_variable_set(:@lru_nodes, [{}])
       Mudis.instance_variable_set(:@current_bytes, [0])
-
+      Mudis.hard_memory_limit = false
       # Set very small threshold
       Mudis.instance_variable_set(:@threshold_bytes, 60)
       Mudis.max_value_bytes = 100
