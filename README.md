@@ -186,6 +186,19 @@ When setting `serializer`, be mindful of the below
 | `JSON`     | Cross-language interoperability       |
 | `Oj`       | API-heavy apps using JSON at scale    |
 
+#### Benchmarks
+
+Based on 100000 iterations
+
+| Serializer     | Iterations | Total Time (s) | Ops/sec |
+|----------------|------------|----------------|---------|
+| oj         | 100000     | 0.1342         | 745320  |
+| marshal        | 100000     | 0.3228         | 309824  |
+| json           | 100000     | 0.9035         | 110682  |
+| oj + zlib    | 100000     | 1.8050         | 55401   |
+| marshal + zlib   | 100000     | 1.8057         | 55381   |
+| json + zlib      | 100000     | 2.7949         | 35780   |
+
 ---
 
 ## Graceful Shutdown
