@@ -1,0 +1,7 @@
+class MudisConfig
+  attr_accessor serializer : Object
+  attr_accessor compress : bool
+  attr_accessor max_value_bytes : Integer?
+  attr_accessor hard_memory_limit : bool
+  attr_accessor max_bytes : Integer
+end

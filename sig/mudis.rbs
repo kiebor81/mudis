@@ -1,11 +1,16 @@
-# sig/mudis.rbs
-
 class Mudis
   # Configuration
   class << self
     attr_accessor serializer : Object
     attr_accessor compress : bool
     attr_accessor max_value_bytes : Integer?
+    attr_accessor hard_memory_limit : bool
+    attr_reader max_bytes : Integer
+    def max_bytes=: (Integer) -> void
+
+    def configure: () { (config: MudisConfig) -> void } -> void
+    def config: () -> MudisConfig
+    def apply_config!: () -> void
   end
 
   # Lifecycle
@@ -13,27 +18,32 @@ class Mudis
   def self.stop_expiry_thread: () -> void
 
   # Core operations
-  def self.write: (String, untyped, ?expires_in: Integer) -> void
-  def self.read: (String) -> untyped?
-  def self.update: (String) { (untyped) -> untyped } -> void
-  def self.delete: (String) -> void
-  def self.exists?: (String) -> bool
+  def self.write: (String, untyped, ?expires_in: Integer, ?namespace: String) -> void
+  def self.read: (String, ?namespace: String) -> untyped?
+  def self.update: (String, ?namespace: String) { (untyped) -> untyped } -> void
+  def self.delete: (String, ?namespace: String) -> void
+  def self.exists?: (String, ?namespace: String) -> bool
 
   # DSL & Helpers
   def self.fetch: (
     String,
     ?expires_in: Integer,
-    ?force: bool
+    ?force: bool,
+    ?namespace: String
   ) { () -> untyped } -> untyped
 
-  def self.clear: (String) -> void
-  def self.replace: (String, untyped, ?expires_in: Integer) -> void
-  def self.inspect: (String) -> Hash[Symbol, untyped]?
+  def self.clear: (String, ?namespace: String) -> void
+  def self.replace: (String, untyped, ?expires_in: Integer, ?namespace: String) -> void
+  def self.inspect: (String, ?namespace: String) -> Hash[Symbol, untyped]?
 
   # Introspection & management
-  def self.metrics: () -> Hash[Symbol, Integer]
+  def self.metrics: () -> Hash[Symbol, untyped]
   def self.cleanup_expired!: () -> void
   def self.all_keys: () -> Array[String]
   def self.current_memory_bytes: () -> Integer
   def self.max_memory_bytes: () -> Integer
+
+  # State reset
+  def self.reset!: () -> void
+  def self.reset_metrics!: () -> void
 end
