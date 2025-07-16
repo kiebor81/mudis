@@ -1,11 +1,12 @@
 # lib/mudis.rb
-require 'json'
-require 'thread'
-require 'zlib'
+
+require "json"
+require "thread" # rubocop:disable Lint/RedundantRequireStatement
+require "zlib"
 
 # Mudis is a thread-safe, in-memory, sharded, LRU cache with optional compression and expiry.
 # It is designed for high concurrency and performance within a Ruby application.
-class Mudis
+class Mudis # rubocop:disable Metrics/ClassLength
   # --- Global Configuration and State ---
 
   @serializer = JSON                            # Default serializer (can be changed to Marshal or Oj)
@@ -27,6 +28,7 @@ class Mudis
   # Node structure for the LRU doubly-linked list
   class LRUNode
     attr_accessor :key, :prev, :next
+
     def initialize(key)
       @key = key
       @prev = nil
@@ -36,7 +38,7 @@ class Mudis
 
   # Number of cache buckets (shards). Default: 32
   def self.buckets
-    @buckets ||= (ENV['MUDIS_BUCKETS']&.to_i || 32)
+    @buckets ||= (ENV["MUDIS_BUCKETS"]&.to_i || 32) # rubocop:disable Style/RedundantParentheses
   end
 
   # --- Internal Structures ---
@@ -48,8 +50,8 @@ class Mudis
   @lru_nodes = Array.new(buckets) { {} }        # Map of key => LRU node
   @current_bytes = Array.new(buckets, 0)        # Memory usage per bucket
   @max_bytes = 1_073_741_824                    # 1 GB global max cache size
-  @threshold_bytes = (@max_bytes * 0.9).to_i     # Eviction threshold at 90%
-  @expiry_thread = nil                          # Background thread for expiry cleanup
+  @threshold_bytes = (@max_bytes * 0.9).to_i # Eviction threshold at 90%
+  @expiry_thread = nil # Background thread for expiry cleanup
 
   class << self
     # Starts a thread that periodically removes expired entries
@@ -60,6 +62,7 @@ class Mudis
       @expiry_thread = Thread.new do
         loop do
           break if @stop_expiry
+
           sleep interval
           cleanup_expired!
         end
@@ -84,7 +87,7 @@ class Mudis
     end
 
     # Reads and returns the value for a key, updating LRU and metrics
-    def read(key)
+    def read(key) # rubocop:disable Metrics/MethodLength
       raw_entry = nil
       idx = bucket_index(key)
       mutex = @mutexes[idx]
@@ -108,7 +111,7 @@ class Mudis
     end
 
     # Writes a value to the cache with optional expiry and LRU tracking
-    def write(key, value, expires_in: nil)
+    def write(key, value, expires_in: nil) # rubocop:disable Metrics/MethodLength,Metrics/CyclomaticComplexity,Metrics/AbcSize
       raw = serializer.dump(value)
       raw = Zlib::Deflate.deflate(raw) if compress
       size = key.bytesize + raw.bytesize
@@ -138,7 +141,7 @@ class Mudis
     end
 
     # Atomically updates the value for a key using a block
-    def update(key)
+    def update(key) # rubocop:disable Metrics/AbcSize,Metrics/MethodLength
       idx = bucket_index(key)
       mutex = @mutexes[idx]
       store = @stores[idx]
@@ -173,6 +176,59 @@ class Mudis
       end
     end
 
+    # Fetches a value for a key, writing it if not present or expired
+    # The block is executed to generate the value if it doesn't exist
+    # Optionally accepts an expiration time
+    # If force is true, it always fetches and writes the value
+    def fetch(key, expires_in: nil, force: false)
+      unless force
+        cached = read(key)
+        return cached if cached
+      end
+
+      value = yield
+      write(key, value, expires_in: expires_in)
+      value
+    end
+
+    # Clears a specific key from the cache, a semantic synonym for delete
+    # This method is provided for clarity in usage
+    # It behaves the same as delete
+    def clear(key)
+      delete(key)
+    end
+
+    # Replaces the value for a key if it exists, otherwise does nothing
+    # This is useful for updating values without needing to check existence first
+    # It will write the new value and update the expiration if provided
+    # If the key does not exist, it will not create a new entry
+    def replace(key, value, expires_in: nil)
+      return unless exists?(key)
+
+      write(key, value, expires_in: expires_in)
+    end
+
+    # Inspects a key and returns all meta data for it
+    def inspect(key) # rubocop:disable Metrics/MethodLength
+      idx = bucket_index(key)
+      store = @stores[idx]
+      mutex = @mutexes[idx]
+
+      mutex.synchronize do
+        entry = store[key]
+        return nil unless entry
+
+        {
+          key: key,
+          bucket: idx,
+          expires_at: entry[:expires_at],
+          created_at: entry[:created_at],
+          size_bytes: key.bytesize + entry[:value].bytesize,
+          compressed: compress
+        }
+      end
+    end
+
     # Removes expired keys across all buckets
     def cleanup_expired!
       now = Time.now
@@ -180,10 +236,8 @@ class Mudis
         mutex = @mutexes[idx]
         store = @stores[idx]
         mutex.synchronize do
-          store.keys.each do |key|
-            if store[key][:expires_at] && now > store[key][:expires_at]
-              evict_key(idx, key)
-            end
+          store.keys.each do |key| # rubocop:disable Style/HashEachMethods
+            evict_key(idx, key) if store[key][:expires_at] && now > store[key][:expires_at]
           end
         end
       end
@@ -270,4 +324,3 @@ class Mudis
     end
   end
 end
-

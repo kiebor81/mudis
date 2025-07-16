@@ -1,4 +1,5 @@
-# spec/mudis_spec.rb
+# frozen_string_literal: true
+
 require_relative "spec_helper"
 
 RSpec.describe Mudis do # rubocop:disable Metrics/BlockLength
@@ -53,6 +54,63 @@ RSpec.describe Mudis do # rubocop:disable Metrics/BlockLength
       Mudis.write("counter", 5)
       Mudis.update("counter") { |v| v + 1 }
       expect(Mudis.read("counter")).to eq(6)
+    end
+  end
+
+  describe ".fetch" do
+    it "returns cached value if exists" do
+      Mudis.write("k", 123)
+      result = Mudis.fetch("k", expires_in: 60) { 999 } # fix: use keyword arg
+      expect(result).to eq(123)
+    end
+
+    it "writes and returns block result if missing" do
+      Mudis.delete("k")
+      result = Mudis.fetch("k", expires_in: 60) { 999 } # fix
+      expect(result).to eq(999)
+      expect(Mudis.read("k")).to eq(999)
+    end
+
+    it "forces overwrite if force: true" do
+      Mudis.write("k", 100)
+      result = Mudis.fetch("k", force: true) { 200 } # fix
+      expect(result).to eq(200)
+    end
+  end
+
+  describe ".clear" do
+    it "removes a key from the cache" do
+      Mudis.write("to_clear", 123)
+      expect(Mudis.read("to_clear")).to eq(123)
+      Mudis.clear("to_clear")
+      expect(Mudis.read("to_clear")).to be_nil
+    end
+  end
+
+  describe ".replace" do
+    it "replaces value only if key exists" do
+      Mudis.write("to_replace", 100)
+      Mudis.replace("to_replace", 200)
+      expect(Mudis.read("to_replace")).to eq(200)
+
+      Mudis.delete("to_replace")
+      Mudis.replace("to_replace", 300)
+      expect(Mudis.read("to_replace")).to be_nil
+    end
+  end
+
+  describe ".inspect" do
+    it "returns metadata for a cached key" do
+      Mudis.write("key1", "abc", expires_in: 60)
+      meta = Mudis.inspect("key1")
+
+      expect(meta).to include(:key, :bucket, :expires_at, :created_at, :size_bytes, :compressed)
+      expect(meta[:key]).to eq("key1")
+      expect(meta[:compressed]).to eq(false)
+    end
+
+    it "returns nil for missing key" do
+      expect(Mudis.inspect("unknown")).to be_nil
     end
   end
 

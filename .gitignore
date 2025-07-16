@@ -11,5 +11,8 @@
 
 # rspec failure tracking
 .rspec_status
+key.key
+*.gem
+pkg/
 bin/
 Gemfile.lock

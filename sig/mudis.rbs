@@ -19,6 +19,17 @@ class Mudis
   def self.delete: (String) -> void
   def self.exists?: (String) -> bool
 
+  # DSL & Helpers
+  def self.fetch: (
+    String,
+    ?expires_in: Integer,
+    ?force: bool
+  ) { () -> untyped } -> untyped
+
+  def self.clear: (String) -> void
+  def self.replace: (String, untyped, ?expires_in: Integer) -> void
+  def self.inspect: (String) -> Hash[Symbol, untyped]?
+
   # Introspection & management
   def self.metrics: () -> Hash[Symbol, Integer]
   def self.cleanup_expired!: () -> void

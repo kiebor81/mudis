@@ -192,7 +192,7 @@ at_exit { Mudis.stop_expiry_thread }
 
 ## Known Limitations
 
-- Data is **process-local** and **non-persistent** (doesn't survive a shutdown).
+- Data is **process-local** and **non-persistent**.
 - Not suitable for cross-process or cross-language use.
 - Keys are globally scoped (no namespacing by default).
 - Compression introduces CPU overhead.
@@ -204,7 +204,6 @@ at_exit { Mudis.stop_expiry_thread }
 - [ ] Namespaced cache keys
 - [ ] Stats per bucket
 - [ ] Optional max memory cap per bucket
-- [ ] Built-in fetch/read-or-write DSL
 
 ---
 
