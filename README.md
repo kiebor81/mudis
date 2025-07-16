@@ -192,9 +192,8 @@ at_exit { Mudis.stop_expiry_thread }
 
 ## Known Limitations
 
-- Data is **process-local** and **non-persistent**.
-- Not suitable for cross-process or cross-language use.
-- Keys are globally scoped (no namespacing by default).
+- Data is **non-persistent**.
+- Keys are globally scoped (no namespacing by default). Namespaving must be handled by the caller/consumer using scoped keys.
 - Compression introduces CPU overhead.
 
 ---
