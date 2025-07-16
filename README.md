@@ -4,9 +4,43 @@
 
 **Mudis** is a fast, thread-safe, in-memory, sharded LRU (Least Recently Used) cache for Ruby applications. Inspired by Redis, it provides value serialization, optional compression, per-key expiry, and metric tracking in a lightweight, dependency-free package that lives inside your Ruby process.
 
-It’s ideal for scenarios where performance and process-local caching are critical, and where a full Redis setup is overkill or otherwise not possible.
+It’s ideal for scenarios where performance and process-local caching are critical, and where a full Redis setup is overkill or otherwise not possible/desirable.
 
-Alternatively, Mudis can be upscaled with higher sharding and resources in a dedicated rails app to provide a Mudis server.
+Alternatively, Mudis can be upscaled with higher sharding and resources in a dedicated Rails app to provide a Mudis server.
+
+### Why another Caching Gem?
+
+There are plenty out there, in various states of maintenance and in many shapes and sizes. So why on earth do we need another? I needed a drop-in replacement for Kredis, and the reason I was interested in using Kredis was for the simplified API and keyed management it gave me in extension to Redis. But what I didn't really need was Redis. I needed an observable, fast, simple, easy to use, flexible and highly configurable, thread-safe and high performant caching system which didn't require too many dependencies or standing up additional services. So, Mudis was born. In its most rudimentary state it was extremely useful in my project, which was an API gateway connecting into mutliple micro-services and a wide selection of APIs. The majority of the data was cold and produced by repeat expensive queries across several domains. Mudis allowed for me to minimize the footprint of the gateway, and improve end user experience, and increase performance. So, yeah, there's a lot of these gems out there, but none which really met all my needs. I decided to provide Mudis for anyone else. If you use it, I'd be interested to know how and whether you got any benefit.
+
+#### Similar Gems
+
+- [FastCache](https://github.com/swoop-inc/fast_cache)
+- [EasyCache](https://github.com/malvads/easycache)
+- [MiniCache](https://github.com/derrickreimer/mini_cache)
+- [Zache](https://github.com/yegor256/zache)
+
+#### Feature / Function Comparison
+
+| **Feature**                            | **Mudis v0.3.0** | **MemoryStore** (`Rails.cache`) | **FastCache**  | **Zache**     | **EasyCache** | **MiniCache**  |
+| -------------------------------------- | ---------------- | ------------------------------- | -------------- | ------------- | ------------- | -------------- |
+| **LRU eviction strategy**              | ✅ Per-bucket     | ✅ Global                        | ✅ Global       | ❌             | ❌             | ✅ Simplistic   |
+| **TTL expiry support**                 | ✅                | ✅                               | ✅              | ✅             | ✅             | ✅              |
+| **Background expiry cleanup thread**   | ✅                | ❌ (only on access)              | ❌              | ❌             | ❌             | ❌              |
+| **Thread safety**                      | ✅ Bucketed       | ⚠️ Global lock                  | ✅ Fine-grained | ⚠️ Coarse     | ⚠️ Unclear    | ⚠️ Minimal     |
+| **Sharding (buckets)**                 | ✅                | ❌                               | ✅              | ❌             | ❌             | ❌              |
+| **Custom serializers**                 | ✅                | ✅                               | ❌              | ❌             | ❌             | ❌              |
+| **Compression (Zlib)**                 | ✅                | ✅                               | ❌              | ❌             | ❌             | ❌              |
+| **Hard memory cap**                    | ✅                | ❌                               | ❌              | ❌             | ❌             | ❌              |
+| **Max value size enforcement**         | ✅                | ❌                               | ❌              | ❌             | ❌             | ❌              |
+| **Metrics (hits, misses, evictions)**  | ✅                | ⚠️ Partial                      | ❌              | ❌             | ❌             | ❌              |
+| **Fetch/update pattern**               | ✅ Full           | ✅ Standard                      | ⚠️ Partial     | ✅ Basic       | ✅ Basic       | ✅ Basic        |
+| **Namespacing**                        | ✅                | ✅                               | ❌              | ❌             | ❌             | ❌              |
+| **Replace (if exists)**                | ✅                | ✅                               | ❌              | ❌             | ❌             | ❌              |
+| **Clear/delete method**                | ✅                | ✅                               | ✅              | ✅             | ✅             | ✅              |
+| **Key inspection with metadata**       | ✅                | ❌                               | ❌              | ❌             | ❌             | ❌              |
+| **Concurrency model**                  | ✅                | ❌                               | ✅              | ❌             | ❌             | ❌              |
+| **Maintenance level**                  | ✅                | ✅                               | ✅              | ⚠️            | ⚠️            | ⚠️             |
+| **Suitable for APIs or microservices** | ✅                | ⚠️ Limited                      | ✅              | ⚠️ Small apps | ⚠️ Small apps | ❌ Experimental |
 
 ---
 
@@ -275,8 +309,6 @@ at_exit { Mudis.stop_expiry_thread }
 
 MIT License © kiebor81
 
----
-
 ## Contributing
 
 PRs are welcome! To get started:
@@ -293,3 +325,5 @@ bundle install
 ## Contact
 
 For issues, suggestions, or feedback, please open a GitHub issue
+
+---
