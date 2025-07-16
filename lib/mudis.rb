@@ -4,6 +4,8 @@ require "json"
 require "thread" # rubocop:disable Lint/RedundantRequireStatement
 require "zlib"
 
+require_relative "mudis_config"
+
 # Mudis is a thread-safe, in-memory, sharded, LRU cache with optional compression and expiry.
 # It is designed for high concurrency and performance within a Ruby application.
 class Mudis # rubocop:disable Metrics/ClassLength
@@ -20,11 +22,72 @@ class Mudis # rubocop:disable Metrics/ClassLength
     attr_accessor :serializer, :compress, :max_value_bytes, :hard_memory_limit
     attr_reader :max_bytes
 
-    # Returns a snapshot of metrics (thread-safe)
-    def metrics
-      @metrics_mutex.synchronize { @metrics.dup }
+    # Configures Mudis with a block, allowing customization of settings
+    def configure
+      yield(config)
+      apply_config!
     end
 
+    # Returns the current configuration object
+    def config
+      @config ||= MudisConfig.new
+    end
+
+    # Applies the current configuration to Mudis
+    def apply_config!
+      self.serializer = config.serializer
+      self.compress = config.compress
+      self.max_value_bytes = config.max_value_bytes
+      self.hard_memory_limit = config.hard_memory_limit
+      self.max_bytes = config.max_bytes
+    end
+
+    # Returns a snapshot of metrics (thread-safe)
+    def metrics # rubocop:disable Metrics/MethodLength
+      @metrics_mutex.synchronize do
+        {
+          hits: @metrics[:hits],
+          misses: @metrics[:misses],
+          evictions: @metrics[:evictions],
+          rejected: @metrics[:rejected],
+          total_memory: current_memory_bytes,
+          buckets: buckets.times.map do |idx|
+            {
+              index: idx,
+              keys: @stores[idx].size,
+              memory_bytes: @current_bytes[idx],
+              lru_size: @lru_nodes[idx].size
+            }
+          end
+        }
+      end
+    end
+
+    # Resets metric counters (thread-safe)
+    def reset_metrics!
+      @metrics_mutex.synchronize do
+        @metrics = { hits: 0, misses: 0, evictions: 0, rejected: 0 }
+      end
+    end
+
+    # Fully resets all internal state (except config)
+    def reset!
+      stop_expiry_thread
+
+      @buckets = nil
+      b = buckets
+
+      @stores        = Array.new(b) { {} }
+      @mutexes       = Array.new(b) { Mutex.new }
+      @lru_heads     = Array.new(b) { nil }
+      @lru_tails     = Array.new(b) { nil }
+      @lru_nodes     = Array.new(b) { {} }
+      @current_bytes = Array.new(b, 0)
+
+      reset_metrics!
+    end
+
+    # Sets the maximum size for a single value in bytes
     def max_bytes=(value)
       @max_bytes = value
       @threshold_bytes = (@max_bytes * 0.9).to_i

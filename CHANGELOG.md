@@ -28,12 +28,12 @@
 - Writes are silently rejected (no exception) and recorded in the `:rejected` counter in `Mudis.metrics`.
 - This provides better safety for memory-constrained environments or long-lived processes.
 
-### Metrics
+#### Metrics
 
 - Added new `:rejected` metric to track how many writes were skipped due to hard memory limits.
 - Metrics now include: `:hits`, `:misses`, `:evictions`, `:rejected`.
 
-### Configuration
+#### Configuration
 
 These settings can be configured:
 
@@ -51,6 +51,35 @@ Mudis.with_namespace("my_feature") { ... }
 - When `max_bytes` is updated, `threshold_bytes` is automatically recalculated
 - Example usage:
 
-  ```ruby
+```ruby
   Mudis.max_bytes = 500_000_000
 ```
+
+## [0.4.0]
+
+#### Per Bucket Stats
+
+- Added deep check for bucket index and return in metrics
+- Simplified metrics call back
+
+#### Configure Interface on Public API
+
+- Added `Mudis.configure` block-style DSL for setting cache behavior
+- Introduced `MudisConfig` to encapsulate serializer, compression, memory, and limit settings
+- Configuration is now centralized and idiomatic:
+
+```ruby
+  Mudis.configure do |c|
+    c.serializer = JSON
+    c.compress = true
+    c.max_value_bytes = 2_000_000
+    c.hard_memory_limit = true
+    c.max_bytes = 500_000_000
+  end
+```
+
+#### Reset and Cache Reset (for developers)
+
+- Added `Mudis.reset!` to fully clear all internal cache state, memory usage, LRU tracking, and metrics.
+- This is useful in test environments or dev consoles when a full wipe of the cache is needed.
+- Added `Mudis.reset_metrics!` to clear only the metrics (hits, misses, evictions, rejected) wihtout touching the cache.

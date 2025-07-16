@@ -46,6 +46,10 @@ There are plenty out there, in various states of maintenance and in many shapes 
 
 ## Design
 
+#### Internal Structure and Behaviour
+
+![mudis_flow](design/mudis_obj.png "Mudis Internals")
+
 #### Write - Read - Eviction
 
 ![mudis_flow](design/mudis_flow.png "Write - Read - Eviction")
@@ -89,20 +93,34 @@ In your Rails app, create an initializer:
 
 ```ruby
 # config/initializers/mudis.rb
+Mudis.configure do |c|
+  c.serializer = JSON        # or Marshal | Oj
+  c.compress = true          # Compress values using Zlib
+  c.max_value_bytes = 2_000_000  # Reject values > 2MB
+  c.hard_memory_limit = true # enforce hard memory limits
+  c.max_bytes = 1_073_741_824 # set maximum cache size
+end
 
-Mudis.serializer = JSON        # or Marshal | Oj
-Mudis.compress = true          # Compress values using Zlib
-Mudis.max_value_bytes = 2_000_000  # Reject values > 2MB
 Mudis.start_expiry_thread(interval: 60) # Cleanup every 60s
-Mudis.hard_memory_limit = true # enforce hard memory limits
-Mudis.max_bytes = 1_073_741_824 # set maximum cache size
 
 at_exit do
   Mudis.stop_expiry_thread
 end
 ```
 
-> If your `lib/` folder isn't eager loaded, explicitly `require 'mudis'` in this file.
+Or with direct setters:
+
+```ruby
+Mudis.serializer = JSON        # or Marshal | Oj
+Mudis.compress = true          # Compress values using Zlib
+Mudis.max_value_bytes = 2_000_000  # Reject values > 2MB
+Mudis.hard_memory_limit = true # enforce hard memory limits
+Mudis.max_bytes = 1_073_741_824 # set maximum cache size
+
+Mudis.start_expiry_thread(interval: 60) # Cleanup every 60s
+
+## set at exit hook
+```
 
 ---
 
@@ -125,6 +143,37 @@ Mudis.update('user:123') { |data| data.merge(age: 30) }
 
 # Delete a key
 Mudis.delete('user:123')
+```
+
+### Developer Utilities
+
+Mudis provides utility methods to help with test environments, console debugging, and dev tool resets.
+
+#### `Mudis.reset!`
+Clears the internal cache state. Including all keys, memory tracking, and metrics. Also stops the expiry thread.
+
+```ruby
+Mudis.write("foo", "bar")
+Mudis.reset!
+Mudis.read("foo") # => nil
+```
+
+- Wipe all buckets (@stores, @lru_nodes, @current_bytes)
+- Reset all metrics (:hits, :misses, :evictions, :rejected)
+- Stop any running background expiry thread
+
+#### `Mudis.reset_metrics!`
+
+Clears only the metric counters and preserves all cached values.
+
+```ruby
+Mudis.write("key", "value")
+Mudis.read("key")    # => "value"
+Mudis.metrics        # => { hits: 1, misses: 0, ... }
+
+Mudis.reset_metrics!
+Mudis.metrics        # => { hits: 0, misses: 0, ... }
+Mudis.read("key")    # => "value" (still cached)
 ```
 
 ---
@@ -222,25 +271,29 @@ Track cache effectiveness and performance:
 
 ```ruby
 Mudis.metrics
-# => { hits: 15, misses: 5, evictions: 3, rejections: 0 }
+# => {
+#   hits: 15,
+#   misses: 5,
+#   evictions: 3,
+#   rejected: 0,
+#   total_memory: 45678,
+#   buckets: [
+#     { index: 0, keys: 12, memory_bytes: 12345, lru_size: 12 },
+#     ...
+#   ]
+# }
+
 ```
 
-Optionally, return these metrics from a controller for remote analysis and monitoring if using rails.
+Optionally, return these metrics from a controller for remote analysis and monitoring if using Rails.
 
 ```ruby
 class MudisController < ApplicationController
-
   def metrics
-    render json: {
-      mudis_metrics: Mudis.metrics,
-      memory_used_bytes: Mudis.current_memory_bytes,
-      memory_max_bytes: Mudis.max_memory_bytes,
-      keys: Mudis.all_keys.size
-    }
+    render json: { mudis: Mudis.metrics }
   end
 
 end
-
 ```
 
 ---
@@ -303,13 +356,26 @@ at_exit { Mudis.stop_expiry_thread }
 
 ## Roadmap
 
-- [ ] Stats per bucket
+#### API Enhancements
+
+- [ ] bulk_read(keys, namespace:): Batch retrieval of multiple keys with a single method call
+
+#### Safety & Policy Controls
+
+- [ ] max_ttl: Enforce a global upper bound on expires_in to prevent excessively long-lived keys
+- [ ] default_ttl: Provide a fallback TTL when one is not specified
+
+#### Debugging
+
+- [ ] clear_namespace(namespace): Remove all keys in a namespace in one call
 
 ---
 
 ## License
 
 MIT License © kiebor81
+
+---
 
 ## Contributing
 

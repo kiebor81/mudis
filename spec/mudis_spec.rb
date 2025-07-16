@@ -227,4 +227,71 @@ RSpec.describe Mudis do # rubocop:disable Metrics/BlockLength
       expect(Mudis.current_memory_bytes).to be > 0
     end
   end
+
+  describe ".metrics" do
+    it "includes per-bucket stats" do
+      Mudis.write("a", "x" * 50)
+      metrics = Mudis.metrics
+
+      expect(metrics).to include(:buckets)
+      expect(metrics[:buckets]).to be_an(Array)
+      expect(metrics[:buckets].first).to include(:index, :keys, :memory_bytes, :lru_size)
+    end
+  end
+
+  describe ".configure" do
+    it "applies configuration settings correctly" do
+      Mudis.configure do |c|
+        c.serializer = JSON
+        c.compress = true
+        c.max_value_bytes = 12_345
+        c.hard_memory_limit = true
+        c.max_bytes = 987_654
+      end
+
+      expect(Mudis.compress).to eq(true)
+      expect(Mudis.max_value_bytes).to eq(12_345)
+      expect(Mudis.hard_memory_limit).to eq(true)
+      expect(Mudis.max_bytes).to eq(987_654)
+    end
+  end
+
+  describe ".reset!" do
+    it "clears all stores, memory, and metrics" do
+      Mudis.write("reset_key", "value")
+      expect(Mudis.read("reset_key")).to eq("value")
+      expect(Mudis.current_memory_bytes).to be > 0
+      expect(Mudis.metrics[:hits]).to be >= 0
+
+      Mudis.reset!
+
+      metrics = Mudis.metrics
+      expect(metrics[:hits]).to eq(0)
+      expect(metrics[:misses]).to eq(0)
+      expect(metrics[:evictions]).to eq(0)
+      expect(metrics[:rejected]).to eq(0)
+      expect(Mudis.current_memory_bytes).to eq(0)
+      expect(Mudis.all_keys).to be_empty
+
+      # Optionally confirm reset_key is now gone
+      expect(Mudis.read("reset_key")).to be_nil
+    end
+  end
+
+  describe ".reset_metrics!" do
+    it "resets only the metrics without clearing cache" do
+      Mudis.write("metrics_key", "value")
+      Mudis.read("metrics_key")  # generates :hits
+      Mudis.read("missing_key")  # generates :misses
+
+      expect(Mudis.metrics[:hits]).to eq(1)
+      expect(Mudis.metrics[:misses]).to eq(1)
+
+      Mudis.reset_metrics!
+
+      expect(Mudis.metrics[:hits]).to eq(0)
+      expect(Mudis.metrics[:misses]).to eq(0)
+      expect(Mudis.read("metrics_key")).to eq("value") # still exists
+    end
+  end
 end
