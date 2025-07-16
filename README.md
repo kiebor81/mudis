@@ -25,8 +25,8 @@ There are plenty out there, in various states of maintenance and in many shapes 
 | -------------------------------------- | ---------------- | ------------------------------- | -------------- | ------------- | ------------- | -------------- |
 | **LRU eviction strategy**              | ✅ Per-bucket     | ✅ Global                        | ✅ Global       | ❌             | ❌             | ✅ Simplistic   |
 | **TTL expiry support**                 | ✅                | ✅                               | ✅              | ✅             | ✅             | ✅              |
-| **Background expiry cleanup thread**   | ✅                | ❌ (only on access)              | ❌              | ❌             | ❌             | ❌              |
-| **Thread safety**                      | ✅ Bucketed       | ⚠️ Global lock                  | ✅ Fine-grained | ⚠️ Coarse     | ⚠️ Unclear    | ⚠️ Minimal     |
+| **Background expiry cleanup thread**   | ✅                | ❌ (only on access)              | ❌              | ✅            | ❌             | ❌              |
+| **Thread safety**                      | ✅ Bucketed       | ⚠️ Global lock                  | ✅ Fine-grained | ✅    | ⚠️     | ⚠️      |
 | **Sharding (buckets)**                 | ✅                | ❌                               | ✅              | ❌             | ❌             | ❌              |
 | **Custom serializers**                 | ✅                | ✅                               | ❌              | ❌             | ❌             | ❌              |
 | **Compression (Zlib)**                 | ✅                | ✅                               | ❌              | ❌             | ❌             | ❌              |
