@@ -253,7 +253,7 @@ end
 | `Mudis.max_value_bytes`  | Max allowed size in bytes for a value       | `nil` (no limit)   |
 | `Mudis.buckets`          | Number of cache shards (via ENV var)        | `32`               |
 | `start_expiry_thread`    | Background TTL cleanup loop (every N sec)   | Disabled by default|
-| `hard_memory_limit `    | Enfirce hard memory limits on key size and reject if exceeded  | `false`|
+| `hard_memory_limit `    | Enforce hard memory limits on key size and reject if exceeded  | `false`|
 
 To customize the number of buckets, set the `MUDIS_BUCKETS` environment variable.
 
@@ -278,7 +278,7 @@ Based on 100000 iterations
 | marshal + zlib   | 100000     | 1.8057         | 55381   |
 | json + zlib      | 100000     | 2.7949         | 35780   |
 
-> If opting for OJ, you will need to install the dependncy in your project and configure as needed.
+> If opting for OJ, you will need to install the dependency in your project and configure as needed.
 
 ---
 
