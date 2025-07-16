@@ -199,6 +199,8 @@ Based on 100000 iterations
 | marshal + zlib   | 100000     | 1.8057         | 55381   |
 | json + zlib      | 100000     | 2.7949         | 35780   |
 
+> If opting for OJ, you will need to install the dependncy in your project and configure as needed.
+
 ---
 
 ## Graceful Shutdown
