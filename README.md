@@ -178,6 +178,14 @@ end
 
 To customize the number of buckets, set the `MUDIS_BUCKETS` environment variable.
 
+When setting `serializer`, be mindful of the below
+
+| Serializer | Recommended for                       |
+| ---------- | ------------------------------------- |
+| `Marshal`  | Ruby-only apps, speed-sensitive logic |
+| `JSON`     | Cross-language interoperability       |
+| `Oj`       | API-heavy apps using JSON at scale    |
+
 ---
 
 ## Graceful Shutdown
@@ -193,7 +201,8 @@ at_exit { Mudis.stop_expiry_thread }
 ## Known Limitations
 
 - Data is **non-persistent**.
-- Keys are globally scoped (no namespacing by default). Namespaving must be handled by the caller/consumer using scoped keys.
+- Keys are globally scoped (no namespacing by default). 
+    - Namespacing must be handled by the caller/consumer using scoped keys.
 - Compression introduces CPU overhead.
 
 ---
