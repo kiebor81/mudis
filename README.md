@@ -95,6 +95,7 @@ Mudis.compress = true          # Compress values using Zlib
 Mudis.max_value_bytes = 2_000_000  # Reject values > 2MB
 Mudis.start_expiry_thread(interval: 60) # Cleanup every 60s
 Mudis.hard_memory_limit = true # enforce hard memory limits
+Mudis.max_bytes = 1_073_741_824 # set maximum cache size
 
 at_exit do
   Mudis.stop_expiry_thread
@@ -253,7 +254,8 @@ end
 | `Mudis.max_value_bytes`  | Max allowed size in bytes for a value       | `nil` (no limit)   |
 | `Mudis.buckets`          | Number of cache shards (via ENV var)        | `32`               |
 | `start_expiry_thread`    | Background TTL cleanup loop (every N sec)   | Disabled by default|
-| `hard_memory_limit `    | Enforce hard memory limits on key size and reject if exceeded  | `false`|
+| `hard_memory_limit`    | Enforce hard memory limits on key size and reject if exceeded  | `false`|
+| `max_bytes`    | Maximum allowed cache size  | `1GB`|
 
 To customize the number of buckets, set the `MUDIS_BUCKETS` environment variable.
 

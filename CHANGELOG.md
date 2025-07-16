@@ -41,3 +41,16 @@ These settings can be configured:
 Mudis.hard_memory_limit = true
 Mudis.max_memory_bytes = 500_000_000
 Mudis.with_namespace("my_feature") { ... }
+```
+
+## [0.3.1]
+
+#### `max_bytes` Setter Exposed
+
+- `Mudis.max_bytes` exposed for config.
+- When `max_bytes` is updated, `threshold_bytes` is automatically recalculated
+- Example usage:
+
+  ```ruby
+  Mudis.max_bytes = 500_000_000
+```

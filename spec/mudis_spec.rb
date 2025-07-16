@@ -216,6 +216,11 @@ RSpec.describe Mudis do # rubocop:disable Metrics/BlockLength
     end
   end
 
+  it "respects max_bytes when updated externally" do
+    Mudis.max_bytes = 100
+    expect(Mudis.send(:max_bytes)).to eq(100)
+  end
+
   describe ".current_memory_bytes" do
     it "returns a non-zero byte count after writes" do
       Mudis.write("size_test", "a" * 100)

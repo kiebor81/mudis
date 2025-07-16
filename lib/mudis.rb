@@ -18,10 +18,16 @@ class Mudis # rubocop:disable Metrics/ClassLength
 
   class << self
     attr_accessor :serializer, :compress, :max_value_bytes, :hard_memory_limit
+    attr_reader :max_bytes
 
     # Returns a snapshot of metrics (thread-safe)
     def metrics
       @metrics_mutex.synchronize { @metrics.dup }
+    end
+
+    def max_bytes=(value)
+      @max_bytes = value
+      @threshold_bytes = (@max_bytes * 0.9).to_i
     end
   end
 
