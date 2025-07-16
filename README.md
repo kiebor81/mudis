@@ -40,7 +40,7 @@ There are plenty out there, in various states of maintenance and in many shapes 
 | **Key inspection with metadata**       | ✅                | ❌                               | ❌              | ❌             | ❌             | ❌              |
 | **Concurrency model**                  | ✅                | ❌                               | ✅              | ❌             | ❌             | ❌              |
 | **Maintenance level**                  | ✅                | ✅                               | ✅              | ⚠️            | ⚠️            | ⚠️             |
-| **Suitable for APIs or microservices** | ✅                | ⚠️ Limited                      | ✅              | ⚠️ Small apps | ⚠️ Small apps | ❌ Experimental |
+| **Suitable for APIs or microservices** | ✅                | ⚠️ Limited                      | ✅              | ⚠️ Small apps | ⚠️ Small apps | ❌ |
 
 ---
 
