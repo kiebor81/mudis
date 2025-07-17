@@ -440,6 +440,29 @@ curl -X DELETE "http://localhost:3000/cache/foo?namespace=orders"
 
 ---
 
+## Project Philosophy
+
+Mudis is intended to be a minimal, thread-safe, in-memory cache designed specifically for Ruby applications. It focuses on:
+
+- In-process caching
+- Fine-grained memory and namespace control
+- Observability and testing friendliness
+- Minimal external dependencies
+- Configurability without complexity
+
+The primary use cases are:
+
+- Per-service application caches
+- Short-lived local caching inside background jobs or API layers
+
+Mudis is not intended to be a general-purpose, distributed caching platform. You are, however, welcome to build on top of Mudis if you want its functionality in such projects. E.g.,
+
+- mudis-server – expose Mudis via HTTP, web sockets, hooks, etc
+- mudis-broker – distributed key routing layer for coordinating multiple Mudis nodes
+- mudis-activejob-store – adapter for using Mudis in job queues or retry buffers
+
+---
+
 ## Roadmap
 
 #### API Enhancements
@@ -465,14 +488,7 @@ MIT License © kiebor81
 
 ## Contributing
 
-PRs are welcome! To get started:
-
-```bash
-git clone https://github.com/kiebor81/mudis
-cd mudis
-bundle install
-
-```
+See [contributor's guide](CONTRIBUTING.md)
 
 ---
 
