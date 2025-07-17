@@ -569,6 +569,12 @@ Mudis is not intended to be a general-purpose, distributed caching platform. You
 
 - [x] clear_namespace(namespace): Remove all keys in a namespace in one call
 
+#### Refactor Mudis 
+
+- [ ] Review Mudis for improved readability and reduce complexity in top-level functions
+- [ ] Enhanced guards
+- [ ] Review for functionality gaps and enhance as needed 
+
 ---
 
 ## License
