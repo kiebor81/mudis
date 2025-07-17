@@ -7,7 +7,8 @@ class MudisConfig
                 :compress,
                 :max_value_bytes,
                 :hard_memory_limit,
-                :max_bytes
+                :max_bytes,
+                :buckets
 
   def initialize
     @serializer = JSON                        # Default serialization strategy
@@ -15,5 +16,6 @@ class MudisConfig
     @max_value_bytes = nil                    # Max size per value (optional)
     @hard_memory_limit = false                # Enforce max_bytes as hard cap
     @max_bytes = 1_073_741_824                # 1 GB default max cache size
+    @buckets = nil                            # use nil to signal fallback to ENV or default
   end
 end

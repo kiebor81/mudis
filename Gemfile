@@ -7,6 +7,8 @@ gemspec
 
 gem "rake", "~> 13.0"
 
-gem "rspec", "~> 3.0"
-
-gem "rubocop", "~> 1.21"
+group :development, :test do
+  gem "climate_control", "~> 1.1.0"
+  gem "rspec", "~> 3.0"
+  gem "rubocop", "~> 1.21"
+end

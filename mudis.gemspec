@@ -17,5 +17,6 @@ Gem::Specification.new do |spec|
   spec.files         = Dir["lib/**/*", "README.md"]
   spec.require_paths = ["lib"]
   spec.test_files = Dir["spec/**/*_spec.rb"]
+  spec.add_development_dependency "climate_control", "~> 1.1.0"
   spec.add_development_dependency "rspec", "~> 3.12"
 end

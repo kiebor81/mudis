@@ -4,4 +4,5 @@ class MudisConfig
   attr_accessor max_value_bytes : Integer?
   attr_accessor hard_memory_limit : bool
   attr_accessor max_bytes : Integer
+  attr_accessor buckets : Integer?
 end

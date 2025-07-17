@@ -309,8 +309,9 @@ end
 | `start_expiry_thread`    | Background TTL cleanup loop (every N sec)   | Disabled by default|
 | `hard_memory_limit`    | Enforce hard memory limits on key size and reject if exceeded  | `false`|
 | `max_bytes`    | Maximum allowed cache size  | `1GB`|
+| `buckets`      | Number of memory buckets (shards)  | `32` |
 
-To customize the number of buckets, set the `MUDIS_BUCKETS` environment variable.
+Buckets can also be set using a `MUDIS_BUCKETS` environment variable.
 
 When setting `serializer`, be mindful of the below
 

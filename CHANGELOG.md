@@ -83,3 +83,21 @@ Mudis.with_namespace("my_feature") { ... }
 - Added `Mudis.reset!` to fully clear all internal cache state, memory usage, LRU tracking, and metrics.
 - This is useful in test environments or dev consoles when a full wipe of the cache is needed.
 - Added `Mudis.reset_metrics!` to clear only the metrics (hits, misses, evictions, rejected) wihtout touching the cache.
+
+## [0.4.1]
+
+Minor updates to gemspec to include missing detail arouns min versions
+
+## [0.4.2]
+
+RBS updates to static type definitions
+
+## [0.4.3]
+
+#### Guard Clauses
+
+Added common-sense guard rails for setters in the following scenarios
+
+- `max_bytes or max_value_bytes <= 0`
+- `MUDIS_BUCKETS <= 0`
+- `max_value_bytes > max_bytes`

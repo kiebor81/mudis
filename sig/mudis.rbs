@@ -3,14 +3,15 @@ class Mudis
   class << self
     attr_accessor serializer : Object
     attr_accessor compress : bool
-    attr_accessor max_value_bytes : Integer?
     attr_accessor hard_memory_limit : bool
     attr_reader max_bytes : Integer
-    def max_bytes=: (Integer) -> void
+    attr_reader max_value_bytes : Integer?
 
     def configure: () { (config: MudisConfig) -> void } -> void
     def config: () -> MudisConfig
     def apply_config!: () -> void
+
+    def buckets: () -> Integer
   end
 
   # Lifecycle

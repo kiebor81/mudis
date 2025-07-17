@@ -1,4 +1,4 @@
-# lib/mudis.rb
+# frozen_string_literal: true
 
 require "json"
 require "thread" # rubocop:disable Lint/RedundantRequireStatement
@@ -19,8 +19,8 @@ class Mudis # rubocop:disable Metrics/ClassLength
   @stop_expiry = false                          # Signal for stopping expiry thread
 
   class << self
-    attr_accessor :serializer, :compress, :max_value_bytes, :hard_memory_limit
-    attr_reader :max_bytes
+    attr_accessor :serializer, :compress, :hard_memory_limit
+    attr_reader :max_bytes, :max_value_bytes
 
     # Configures Mudis with a block, allowing customization of settings
     def configure
@@ -35,11 +35,25 @@ class Mudis # rubocop:disable Metrics/ClassLength
 
     # Applies the current configuration to Mudis
     def apply_config!
+      validate_config!
+
       self.serializer = config.serializer
       self.compress = config.compress
       self.max_value_bytes = config.max_value_bytes
       self.hard_memory_limit = config.hard_memory_limit
       self.max_bytes = config.max_bytes
+    end
+
+    # Validates the current configuration, raising errors for invalid settings
+    def validate_config! # rubocop:disable Metrics/AbcSize
+      if config.max_value_bytes && config.max_value_bytes > config.max_bytes
+        raise ArgumentError,
+              "max_value_bytes cannot exceed max_bytes"
+      end
+
+      raise ArgumentError, "max_value_bytes must be > 0" if config.max_value_bytes && config.max_value_bytes <= 0
+
+      raise ArgumentError, "buckets must be > 0" if config.buckets && config.buckets <= 0
     end
 
     # Returns a snapshot of metrics (thread-safe)
@@ -89,8 +103,17 @@ class Mudis # rubocop:disable Metrics/ClassLength
 
     # Sets the maximum size for a single value in bytes
     def max_bytes=(value)
+      raise ArgumentError, "max_bytes must be > 0" if value.to_i <= 0
+
       @max_bytes = value
       @threshold_bytes = (@max_bytes * 0.9).to_i
+    end
+
+    # Sets the maximum size for a single value in bytes, raising an error if invalid
+    def max_value_bytes=(value)
+      raise ArgumentError, "max_value_bytes must be > 0" if value && value.to_i <= 0
+
+      @max_value_bytes = value
     end
   end
 
@@ -107,7 +130,12 @@ class Mudis # rubocop:disable Metrics/ClassLength
 
   # Number of cache buckets (shards). Default: 32
   def self.buckets
-    @buckets ||= (ENV["MUDIS_BUCKETS"]&.to_i || 32) # rubocop:disable Style/RedundantParentheses
+    return @buckets if @buckets
+
+    val = config.buckets || ENV["MUDIS_BUCKETS"]&.to_i || 32
+    raise ArgumentError, "bucket count must be > 0" if val <= 0
+
+    @buckets = val
   end
 
   # --- Internal Structures ---
