@@ -6,7 +6,7 @@
 
 It’s ideal for scenarios where performance and process-local caching are critical, and where a full Redis setup is overkill or otherwise not possible/desirable.
 
-Alternatively, Mudis can be upscaled with higher sharding and resources in a dedicated Rails app to provide a Mudis server.
+Alternatively, Mudis can be upscaled with higher sharding and resources in a dedicated Rails app to provide a [Mudis server](#create-a-mudis-server).
 
 ### Why another Caching Gem?
 
@@ -351,6 +351,93 @@ at_exit { Mudis.stop_expiry_thread }
 
 - Data is **non-persistent**.
 - Compression introduces CPU overhead.
+
+---
+
+## Create a Mudis Server
+
+### Minimal Setup
+
+- Create a new Rails API app:
+
+```bash
+rails new mudis-server --api
+cd mudis-server
+```
+
+- Add mudis to your Gemfile
+- Create Initializer: `config/initializers/mudis.rb`
+- Define routes
+
+```ruby
+Rails.application.routes.draw do
+  get "/cache/:key", to: "cache#show"
+  post "/cache/:key", to: "cache#write"
+  delete "/cache/:key", to: "cache#delete"
+  get "/metrics", to: "cache#metrics"
+end
+```
+
+- Create a `cache_controller` (with optional per caller/consumer namespace)
+
+```ruby
+class CacheController < ApplicationController
+  skip_before_action :verify_authenticity_token
+
+  def show
+    key = params[:key]
+    ns  = params[:namespace]
+
+    value = Mudis.read(key, namespace: ns)
+    if value.nil?
+      render json: { error: "not found" }, status: :not_found
+    else
+      render json: { value: value }
+    end
+  end
+
+  def write
+    key = params[:key]
+    ns  = params[:namespace]
+    val = params[:value]
+    ttl = params[:expires_in]&.to_i
+
+    Mudis.write(key, val, expires_in: ttl, namespace: ns)
+    render json: { status: "written", key: key }
+  end
+
+  def delete
+    key = params[:key]
+    ns  = params[:namespace]
+
+    Mudis.delete(key, namespace: ns)
+    render json: { status: "deleted" }
+  end
+
+  def metrics
+    render json: Mudis.metrics
+  end
+end
+```
+
+- Test it
+
+```bash
+curl http://localhost:3000/cache/foo
+curl -X POST http://localhost:3000/cache/foo -d 'value=bar&expires_in=60'
+curl http://localhost:3000/metrics
+
+# Write with namespace
+curl -X POST "http://localhost:3000/cache/foo?namespace=orders" \
+     -d "value=123&expires_in=60"
+
+# Read from namespace
+curl "http://localhost:3000/cache/foo?namespace=orders"
+
+# Delete from namespace
+curl -X DELETE "http://localhost:3000/cache/foo?namespace=orders"
+
+```
 
 ---
 
