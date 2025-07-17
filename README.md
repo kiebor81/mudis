@@ -395,7 +395,7 @@ _10000 iterations of 1MB, Marshal (to match MemoryStore default), compression ON
 
 > For context: a typical database query or HTTP call takes 10–50ms. A difference of less than 1ms per operation is negligible for most apps.
 
-##### **Why this overhead exists**
+#### **Why this overhead exists**
 
 Mudis includes features that MemoryStore doesn’t:
 
@@ -426,7 +426,7 @@ _10000 iterations of 1MB, Marshal (to match MemoryStore default), compression OF
 
 With compression disabled, Mudis writes significanty faster and reads are virtually identical. Optimisation and configuration of Mudis will be determined by your individual needs.
 
-##### Other Benchmarks
+#### Other Benchmarks
 
 _10000 iterations of 512KB, JSON, compression OFF (to match MemoryStore default)_
 
