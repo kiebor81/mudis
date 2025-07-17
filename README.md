@@ -343,7 +343,7 @@ _100000 iterations_
 
 Mudis is marginally slower than `Rails.cache` by design; it trades raw speed for control, observability, and safety.
 
-_10000 iterations of 1MB, Marshal (to match MemoryStore default)_
+_10000 iterations of 1MB, Marshal (to match MemoryStore default), compression ON_
 
 | Operation | `Rails.cache` | `Mudis`     | Delta     |
 | --------- | ------------- | ----------- | --------- |
@@ -373,6 +373,15 @@ It will be down to the developer to decide if a fraction of a millisecond is wor
 - Memory protection
 - Namespace scoping
 - Real-time metrics for hits, misses, evictions, memory usage
+
+_10000 iterations of 1MB, Marshal (to match MemoryStore default), compression OFF (to match MemoryStore default)_
+
+| Operation | `Rails.cache` | `Mudis`     | Delta         |
+| --------- | ------------- | ----------- | ------------- |
+| Write     | 2.342 ms/op   | 0.501 ms/op | **−1.841 ms** |
+| Read      | 0.007 ms/op   | 0.011 ms/op | +0.004 ms     |
+
+With compression disabled, Mudis writes significanty faster and reads are virtually identical. Optimisation and configuration of Mudis will be determined by your individual needs.
 
 ---
 
