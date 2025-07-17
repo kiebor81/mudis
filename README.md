@@ -382,7 +382,6 @@ end
 
 ```ruby
 class CacheController < ApplicationController
-  skip_before_action :verify_authenticity_token
 
   def show
     key = params[:key]
