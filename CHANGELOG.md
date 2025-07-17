@@ -18,13 +18,13 @@
 - Added `with_namespace(namespace) { ... }` block syntax to scope cache keys.
 - All public methods (`write`, `read`, `delete`, `exists?`, etc.) now accept an optional `namespace:` keyword.
 - Keys are internally expanded as `"namespace:key"` at write/read time.
-- Namespacing is opt-in and backward compatible — legacy keys remain untouched unless namespace is provided.
+- Namespacing is opt-in, manually scped keys are still handled
 - Supports nested use and thread-safe state via `Thread.current[:mudis_namespace]`.
 
 #### Hard Memory Limits (Memory Guarding)
 
 - Introduced a configurable `Mudis.hard_memory_limit = true` setting.
-- When enabled, Mudis will **not allow writes that exceed `Mudis.max_memory_bytes`**.
+- When enabled, Mudis will not allow writes that exceed `Mudis.max_memory_bytes`.
 - Writes are silently rejected (no exception) and recorded in the `:rejected` counter in `Mudis.metrics`.
 - This provides better safety for memory-constrained environments or long-lived processes.
 
@@ -64,7 +64,7 @@ Mudis.with_namespace("my_feature") { ... }
 
 #### Configure Interface on Public API
 
-- Added `Mudis.configure` block-style DSL for setting cache behavior
+- Added `Mudis.configure` block-style DSL for setting cache behaviour
 - Introduced `MudisConfig` to encapsulate serializer, compression, memory, and limit settings
 - Configuration is now centralized and idiomatic:
 
