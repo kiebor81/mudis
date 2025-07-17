@@ -7,8 +7,8 @@ Gem::Specification.new do |spec|
   spec.version       = MUDIS_VERSION
   spec.authors       = ["kiebor81"]
 
-  spec.summary       = "A fast in-memory Ruby LRU cache with compression and expiry."
-  spec.description   = "Thread-safe, bucketed, in-process cache for Ruby apps. Drop-in replacement for Kredis in some scenarios." # rubocop:disable Layout/LineLength
+  spec.summary       = "A fast in-memory, thread-safe and high performance Ruby LRU cache with compression and auto-expiry." # rubocop:disable Layout/LineLength
+  spec.description   = "Mudis is a fast, thread-safe, in-memory, sharded LRU cache for Ruby applications. Inspired by Redis, it provides value serialization, optional compression, per-key expiry, and metric tracking in a lightweight, dependency-free package." # rubocop:disable Layout/LineLength
   spec.homepage      = "https://github.com/kiebor81/mudis"
   spec.license       = "MIT"
 

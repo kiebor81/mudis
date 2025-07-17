@@ -101,3 +101,9 @@ Added common-sense guard rails for setters in the following scenarios
 - `max_bytes or max_value_bytes <= 0`
 - `MUDIS_BUCKETS <= 0`
 - `max_value_bytes > max_bytes`
+
+## [0.4.4]
+
+Gemspec summary and description corrections.
+
+---
