@@ -305,11 +305,10 @@ end
 | `Mudis.serializer`       | JSON, Marshal, or Oj                        | `JSON`             |
 | `Mudis.compress`         | Enable Zlib compression                     | `false`            |
 | `Mudis.max_value_bytes`  | Max allowed size in bytes for a value       | `nil` (no limit)   |
-| `Mudis.buckets`          | Number of cache shards (via ENV var)        | `32`               |
-| `start_expiry_thread`    | Background TTL cleanup loop (every N sec)   | Disabled by default|
-| `hard_memory_limit`    | Enforce hard memory limits on key size and reject if exceeded  | `false`|
-| `max_bytes`    | Maximum allowed cache size  | `1GB`|
-| `buckets`      | Number of memory buckets (shards)  | `32` |
+| `Mudis.buckets`          | Number of cache shards        | `32`               |
+| `Mudis.start_expiry_thread`    | Background TTL cleanup loop (every N sec)   | Disabled by default|
+| `Mudis.hard_memory_limit`    | Enforce hard memory limits on key size and reject if exceeded  | `false`|
+| `Mudis.max_bytes`    | Maximum allowed cache size  | `1GB`|
 
 Buckets can also be set using a `MUDIS_BUCKETS` environment variable.
 
