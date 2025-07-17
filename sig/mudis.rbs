@@ -6,10 +6,13 @@ class Mudis
     attr_accessor hard_memory_limit : bool
     attr_reader max_bytes : Integer
     attr_reader max_value_bytes : Integer?
-
+    attr_accessor max_ttl: Integer?
+    attr_accessor default_ttl: Integer?
+    
     def configure: () { (config: MudisConfig) -> void } -> void
     def config: () -> MudisConfig
     def apply_config!: () -> void
+    def validate_config!: () -> void
 
     def buckets: () -> Integer
   end
@@ -43,6 +46,7 @@ class Mudis
   def self.all_keys: () -> Array[String]
   def self.current_memory_bytes: () -> Integer
   def self.max_memory_bytes: () -> Integer
+  def self.least_touched: (?Integer) -> Array[[String, Integer]]
 
   # State reset
   def self.reset!: () -> void

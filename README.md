@@ -176,6 +176,20 @@ Mudis.metrics        # => { hits: 0, misses: 0, ... }
 Mudis.read("key")    # => "value" (still cached)
 ```
 
+#### `Mudis.least_touched`
+
+Returns the top `n` (or all) keys that have been read the fewest number of times, across all buckets. This is useful for identifying low-value cache entries that may be safe to remove or exclude from caching altogether.
+
+Each result includes the full key and its access count.
+
+```ruby
+Mudis.least_touched
+# => [["foo", 0], ["user:42", 1], ["product:123", 2], ...]
+
+Mudis.least_touched(5)
+# => returns top 5 least accessed keys
+```
+
 ---
 
 ## Rails Service Integration
@@ -277,6 +291,11 @@ Mudis.metrics
 #   evictions: 3,
 #   rejected: 0,
 #   total_memory: 45678,
+#   least_touched: [
+#     ["user:1", 0],
+#     ["post:5", 1],
+#     ...
+#   ],
 #   buckets: [
 #     { index: 0, keys: 12, memory_bytes: 12345, lru_size: 12 },
 #     ...
@@ -309,6 +328,8 @@ end
 | `Mudis.start_expiry_thread`    | Background TTL cleanup loop (every N sec)   | Disabled by default|
 | `Mudis.hard_memory_limit`    | Enforce hard memory limits on key size and reject if exceeded  | `false`|
 | `Mudis.max_bytes`    | Maximum allowed cache size  | `1GB`|
+| `Mudis.max_ttl`    | Set the maximum permitted TTL  | `nil` (no limit) |
+| `Mudis.default_ttl`    | Set the default TTL for fallback when none is provided  | `nil` |
 
 Buckets can also be set using a `MUDIS_BUCKETS` environment variable.
 
@@ -519,8 +540,8 @@ Mudis is not intended to be a general-purpose, distributed caching platform. You
 
 #### Safety & Policy Controls
 
-- [ ] max_ttl: Enforce a global upper bound on expires_in to prevent excessively long-lived keys
-- [ ] default_ttl: Provide a fallback TTL when one is not specified
+- [x] max_ttl: Enforce a global upper bound on expires_in to prevent excessively long-lived keys
+- [x] default_ttl: Provide a fallback TTL when one is not specified
 
 #### Debugging
 

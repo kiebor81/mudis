@@ -1,8 +1,10 @@
 class MudisConfig
-  attr_accessor serializer : Object
-  attr_accessor compress : bool
-  attr_accessor max_value_bytes : Integer?
-  attr_accessor hard_memory_limit : bool
-  attr_accessor max_bytes : Integer
-  attr_accessor buckets : Integer?
+  attr_accessor serializer: Object
+  attr_accessor compress: bool
+  attr_accessor max_value_bytes: Integer?
+  attr_accessor hard_memory_limit: bool
+  attr_accessor max_bytes: Integer
+  attr_accessor max_ttl: Integer?
+  attr_accessor default_ttl: Integer?
+  attr_accessor buckets: Integer?
 end

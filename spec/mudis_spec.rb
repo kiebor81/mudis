@@ -239,6 +239,23 @@ RSpec.describe Mudis do # rubocop:disable Metrics/BlockLength
     end
   end
 
+  describe ".least_touched" do
+    it "returns keys with lowest read access counts" do
+      Mudis.reset!
+      Mudis.write("a", 1)
+      Mudis.write("b", 2)
+      Mudis.write("c", 3)
+
+      Mudis.read("a")
+      Mudis.read("a")
+      Mudis.read("b")
+
+      least = Mudis.least_touched(2)
+      expect(least.map(&:first)).to include("c") # Never read
+      expect(least.first.last).to eq(0)
+    end
+  end
+
   describe ".configure" do
     it "applies configuration settings correctly" do
       Mudis.configure do |c|

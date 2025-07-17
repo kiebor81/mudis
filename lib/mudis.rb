@@ -17,9 +17,11 @@ class Mudis # rubocop:disable Metrics/ClassLength
   @metrics_mutex = Mutex.new                    # Mutex for synchronizing access to metrics
   @max_value_bytes = nil                        # Optional size cap per value
   @stop_expiry = false                          # Signal for stopping expiry thread
+  @max_ttl = nil                                # Optional maximum TTL for cache entries
+  @default_ttl = nil                            # Default TTL for cache entries if not specified
 
   class << self
-    attr_accessor :serializer, :compress, :hard_memory_limit
+    attr_accessor :serializer, :compress, :hard_memory_limit, :max_ttl, :default_ttl
     attr_reader :max_bytes, :max_value_bytes
 
     # Configures Mudis with a block, allowing customization of settings
@@ -34,7 +36,7 @@ class Mudis # rubocop:disable Metrics/ClassLength
     end
 
     # Applies the current configuration to Mudis
-    def apply_config!
+    def apply_config! # rubocop:disable Metrics/AbcSize,Metrics/MethodLength
       validate_config!
 
       self.serializer = config.serializer
@@ -42,10 +44,17 @@ class Mudis # rubocop:disable Metrics/ClassLength
       self.max_value_bytes = config.max_value_bytes
       self.hard_memory_limit = config.hard_memory_limit
       self.max_bytes = config.max_bytes
+      self.max_ttl = config.max_ttl
+      self.default_ttl = config.default_ttl
+
+      if config.buckets # rubocop:disable Style/GuardClause
+        @buckets = config.buckets
+        reset!
+      end
     end
 
     # Validates the current configuration, raising errors for invalid settings
-    def validate_config! # rubocop:disable Metrics/AbcSize
+    def validate_config! # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
       if config.max_value_bytes && config.max_value_bytes > config.max_bytes
         raise ArgumentError,
               "max_value_bytes cannot exceed max_bytes"
@@ -54,6 +63,8 @@ class Mudis # rubocop:disable Metrics/ClassLength
       raise ArgumentError, "max_value_bytes must be > 0" if config.max_value_bytes && config.max_value_bytes <= 0
 
       raise ArgumentError, "buckets must be > 0" if config.buckets && config.buckets <= 0
+      raise ArgumentError, "max_ttl must be > 0" if config.max_ttl && config.max_ttl <= 0
+      raise ArgumentError, "default_ttl must be > 0" if config.default_ttl && config.default_ttl <= 0
     end
 
     # Returns a snapshot of metrics (thread-safe)
@@ -65,6 +76,7 @@ class Mudis # rubocop:disable Metrics/ClassLength
           evictions: @metrics[:evictions],
           rejected: @metrics[:rejected],
           total_memory: current_memory_bytes,
+          least_touched: least_touched(10),
           buckets: buckets.times.map do |idx|
             {
               index: idx,
@@ -186,11 +198,12 @@ class Mudis # rubocop:disable Metrics/ClassLength
     end
 
     # Reads and returns the value for a key, updating LRU and metrics
-    def read(key, namespace: nil) # rubocop:disable Metrics/MethodLength,Metrics/AbcSize
+    def read(key, namespace: nil) # rubocop:disable Metrics/MethodLength,Metrics/AbcSize,Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
       key = namespaced_key(key, namespace)
       raw_entry = nil
       idx = bucket_index(key)
       mutex = @mutexes[idx]
+      store = @stores[idx]
 
       mutex.synchronize do
         raw_entry = @stores[idx][key]
@@ -198,6 +211,8 @@ class Mudis # rubocop:disable Metrics/ClassLength
           evict_key(idx, key)
           raw_entry = nil
         end
+
+        store[key][:touches] = (store[key][:touches] || 0) + 1 if store[key]
 
         metric(:hits) if raw_entry
         metric(:misses) unless raw_entry
@@ -223,6 +238,9 @@ class Mudis # rubocop:disable Metrics/ClassLength
         return
       end
 
+      # Ensure expires_in respects max_ttl and default_ttl
+      expires_in = effective_ttl(expires_in)
+
       idx = bucket_index(key)
       mutex = @mutexes[idx]
       store = @stores[idx]
@@ -238,7 +256,8 @@ class Mudis # rubocop:disable Metrics/ClassLength
         store[key] = {
           value: raw,
           expires_at: expires_in ? Time.now + expires_in : nil,
-          created_at: Time.now
+          created_at: Time.now,
+          touches: 0
         }
 
         insert_lru(idx, key)
@@ -364,6 +383,24 @@ class Mudis # rubocop:disable Metrics/ClassLength
       keys
     end
 
+    # Returns the least-touched keys across all buckets
+    def least_touched(n = 10) # rubocop:disable Metrics/MethodLength,Naming/MethodParameterName
+      keys_with_touches = []
+
+      buckets.times do |idx|
+        mutex = @mutexes[idx]
+        store = @stores[idx]
+
+        mutex.synchronize do
+          store.each do |key, entry|
+            keys_with_touches << [key, entry[:touches] || 0]
+          end
+        end
+      end
+
+      keys_with_touches.sort_by { |_, count| count }.first(n)
+    end
+
     # Returns total memory used across all buckets
     def current_memory_bytes
       @current_bytes.sum
@@ -446,6 +483,15 @@ class Mudis # rubocop:disable Metrics/ClassLength
     def namespaced_key(key, namespace = nil)
       ns = namespace || Thread.current[:mudis_namespace]
       ns ? "#{ns}:#{key}" : key
+    end
+
+    # Calculates the effective TTL for an entry, respecting max_ttl if set
+    def effective_ttl(expires_in)
+      ttl = expires_in || @default_ttl
+      return nil unless ttl
+      return ttl unless @max_ttl
+
+      [ttl, @max_ttl].min
     end
   end
 end

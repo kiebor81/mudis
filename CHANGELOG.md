@@ -106,4 +106,21 @@ Added common-sense guard rails for setters in the following scenarios
 
 Gemspec summary and description corrections.
 
+## [0.5.0]
+
+#### Max TTL
+
+- Added configuration property `max_ttl`. 
+- Added guards for when `expires_in` > `max_ttl` or when `max_ttl` = 0
+
+#### Default TTL
+
+- Added configuration property `default_ttl`.
+- Added fallback logic to `default_ttl` when `expires_in` not provided
+
+#### Least Touched
+
+- Added metrics for touch times on keys
+- Added `least_touched` function to dev API and `metrics` result
+
 ---
