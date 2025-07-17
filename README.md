@@ -395,7 +395,7 @@ _10000 iterations of 1MB, Marshal (to match MemoryStore default), compression ON
 
 > For context: a typical database query or HTTP call takes 10–50ms. A difference of less than 1ms per operation is negligible for most apps.
 
-###### **Why this overhead exists**
+##### **Why this overhead exists**
 
 Mudis includes features that MemoryStore doesn’t:
 
@@ -425,6 +425,22 @@ _10000 iterations of 1MB, Marshal (to match MemoryStore default), compression OF
 | Read      | 0.007 ms/op   | 0.011 ms/op | +0.004 ms     |
 
 With compression disabled, Mudis writes significanty faster and reads are virtually identical. Optimisation and configuration of Mudis will be determined by your individual needs.
+
+##### Other Benchmarks
+
+_10000 iterations of 512KB, JSON, compression OFF (to match MemoryStore default)_
+
+| Operation | `Rails.cache` | `Mudis`     | Delta         |
+| --------- | ------------- | ----------- | ------------- |
+| Write     | 1.291 ms/op   | 0.32 ms/op | **−0.971 ms** |
+| Read      | 0.011 ms/op   | 0.048 ms/op | +0.037 ms     |
+
+_10000 iterations of 512KB, JSON, compression ON_
+
+| Operation | `Rails.cache` | `Mudis`     | Delta         |
+| --------- | ------------- | ----------- | ------------- |
+| Write     | 1.11 ms/op   | 1.16 ms/op |  +0.05 ms |
+| Read      | 0.07 ms/op   | 0.563 ms/op | +0.493 ms     |
 
 ---
 
