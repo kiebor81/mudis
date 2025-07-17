@@ -320,20 +320,59 @@ When setting `serializer`, be mindful of the below
 | `JSON`     | Cross-language interoperability       |
 | `Oj`       | API-heavy apps using JSON at scale    |
 
-#### Benchmarks
+---
 
-Based on 100000 iterations
+## Benchmarks
 
-| Serializer     | Iterations | Total Time (s) | Ops/sec |
-|----------------|------------|----------------|---------|
-| oj         | 100000     | 0.1342         | 745320  |
-| marshal        | 100000     | 0.3228         | 309824  |
-| json           | 100000     | 0.9035         | 110682  |
-| oj + zlib    | 100000     | 1.8050         | 55401   |
-| marshal + zlib   | 100000     | 1.8057         | 55381   |
-| json + zlib      | 100000     | 2.7949         | 35780   |
+#### Serializer(s)
+
+_100000 iterations_
+
+| Serializer     | Total Time (s) | Ops/sec |
+|----------------|------------|----------------|
+| oj         | 0.1342         | 745320  |
+| marshal        | 0.3228         | 309824  |
+| json           | 0.9035         | 110682  |
+| oj + zlib    | 1.8050         | 55401   |
+| marshal + zlib   | 1.8057         | 55381   |
+| json + zlib      | 2.7949         | 35780   |
 
 > If opting for OJ, you will need to install the dependency in your project and configure as needed.
+
+#### Mudis vs Rails.cache
+
+Mudis is marginally slower than `Rails.cache` by design; it trades raw speed for control, observability, and safety.
+
+_10000 iterations of 1MB, Marshal (to match MemoryStore default)_
+
+| Operation | `Rails.cache` | `Mudis`     | Delta     |
+| --------- | ------------- | ----------- | --------- |
+| Write     | 2.139 ms/op   | 2.417 ms/op | +0.278 ms |
+| Read      | 0.007 ms/op   | 0.810 ms/op | +0.803 ms |
+
+> For context: a typical database query or HTTP call takes 10–50ms. A difference of less than 1ms per operation is negligible for most apps.
+
+###### **Why this overhead exists**
+
+Mudis includes features that MemoryStore doesn’t:
+
+| Feature            | Mudis                  | Rails.cache (MemoryStore)   |
+| ------------------ | ---------------------- | --------------------------- |
+| Per-key TTL expiry | ✅    | ⚠️ on access |
+| True LRU eviction  | ✅     | ❌          |
+| Hard memory limits | ✅                   | ❌         |
+| Value compression  | ✅     | ❌             |
+| Thread safety      | ✅ Bucket-level mutexes | ✅ Global mutex              |
+| Observability      | ✅         | ❌           |
+| Namespacing        | ✅           | ❌ Manual scoping        |
+
+It will be down to the developer to decide if a fraction of a millisecond is worth
+
+- Predictable eviction
+- Configurable expiry
+- Memory protection
+- Namespace scoping
+- Real-time metrics for hits, misses, evictions, memory usage
 
 ---
 
