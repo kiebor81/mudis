@@ -114,97 +114,11 @@ RSpec.describe Mudis do # rubocop:disable Metrics/BlockLength
     end
   end
 
-  describe "namespacing" do
-    it "uses thread-local namespace in block" do
-      Mudis.with_namespace("test") do
-        Mudis.write("foo", "bar")
-      end
-      expect(Mudis.read("foo", namespace: "test")).to eq("bar")
-      expect(Mudis.read("foo")).to be_nil
-    end
-
-    it "supports explicit namespace override" do
-      Mudis.write("x", 1, namespace: "alpha")
-      Mudis.write("x", 2, namespace: "beta")
-      expect(Mudis.read("x", namespace: "alpha")).to eq(1)
-      expect(Mudis.read("x", namespace: "beta")).to eq(2)
-      expect(Mudis.read("x")).to be_nil
-    end
-  end
-
   describe "expiry handling" do
     it "expires values after specified time" do
       Mudis.write("short_lived", "gone soon", expires_in: 1)
       sleep 2
       expect(Mudis.read("short_lived")).to be_nil
-    end
-  end
-
-  describe ".metrics" do
-    it "tracks hits and misses" do
-      Mudis.write("hit_me", "value")
-      Mudis.read("hit_me")   # hit
-      Mudis.read("miss_me")  # miss
-      metrics = Mudis.metrics
-      expect(metrics[:hits]).to eq(1)
-      expect(metrics[:misses]).to eq(1)
-    end
-  end
-
-  describe "memory guards" do
-    before do
-      Mudis.stop_expiry_thread
-      Mudis.instance_variable_set(:@buckets, 1)
-      Mudis.instance_variable_set(:@stores, [{}])
-      Mudis.instance_variable_set(:@mutexes, [Mutex.new])
-      Mudis.instance_variable_set(:@lru_heads, [nil])
-      Mudis.instance_variable_set(:@lru_tails, [nil])
-      Mudis.instance_variable_set(:@lru_nodes, [{}])
-      Mudis.instance_variable_set(:@current_bytes, [0])
-
-      Mudis.max_value_bytes = nil
-      Mudis.instance_variable_set(:@threshold_bytes, 1_000_000) # optional
-      Mudis.hard_memory_limit = true
-      Mudis.instance_variable_set(:@max_bytes, 100) # artificially low
-    end
-
-    it "rejects writes that exceed max memory" do
-      big_value = "a" * 90
-      Mudis.write("a", big_value)
-      expect(Mudis.read("a")).to eq(big_value)
-
-      big_value_2 = "b" * 90 # rubocop:disable Naming/VariableNumber
-      Mudis.write("b", big_value_2)
-      expect(Mudis.read("b")).to be_nil
-      expect(Mudis.metrics[:rejected]).to be > 0
-    end
-  end
-
-  describe "LRU eviction" do
-    it "evicts old entries when size limit is reached" do
-      Mudis.stop_expiry_thread
-
-      # Force one bucket
-      Mudis.instance_variable_set(:@buckets, 1)
-      Mudis.instance_variable_set(:@stores, [{}])
-      Mudis.instance_variable_set(:@mutexes, [Mutex.new])
-      Mudis.instance_variable_set(:@lru_heads, [nil])
-      Mudis.instance_variable_set(:@lru_tails, [nil])
-      Mudis.instance_variable_set(:@lru_nodes, [{}])
-      Mudis.instance_variable_set(:@current_bytes, [0])
-      Mudis.hard_memory_limit = false
-      # Set very small threshold
-      Mudis.instance_variable_set(:@threshold_bytes, 60)
-      Mudis.max_value_bytes = 100
-
-      big_val1 = "a" * 50
-      big_val2 = "b" * 50
-
-      Mudis.write("a", big_val1)
-      Mudis.write("b", big_val2)
-
-      expect(Mudis.read("a")).to be_nil
-      expect(Mudis.read("b")).not_to be_nil
     end
   end
 
@@ -223,19 +137,13 @@ RSpec.describe Mudis do # rubocop:disable Metrics/BlockLength
 
   describe ".current_memory_bytes" do
     it "returns a non-zero byte count after writes" do
+      Mudis.configure do |c|
+        c.max_value_bytes = nil
+        c.hard_memory_limit = false
+      end
+
       Mudis.write("size_test", "a" * 100)
       expect(Mudis.current_memory_bytes).to be > 0
-    end
-  end
-
-  describe ".metrics" do
-    it "includes per-bucket stats" do
-      Mudis.write("a", "x" * 50)
-      metrics = Mudis.metrics
-
-      expect(metrics).to include(:buckets)
-      expect(metrics[:buckets]).to be_an(Array)
-      expect(metrics[:buckets].first).to include(:index, :keys, :memory_bytes, :lru_size)
     end
   end
 
@@ -270,45 +178,6 @@ RSpec.describe Mudis do # rubocop:disable Metrics/BlockLength
       expect(Mudis.max_value_bytes).to eq(12_345)
       expect(Mudis.hard_memory_limit).to eq(true)
       expect(Mudis.max_bytes).to eq(987_654)
-    end
-  end
-
-  describe ".reset!" do
-    it "clears all stores, memory, and metrics" do
-      Mudis.write("reset_key", "value")
-      expect(Mudis.read("reset_key")).to eq("value")
-      expect(Mudis.current_memory_bytes).to be > 0
-      expect(Mudis.metrics[:hits]).to be >= 0
-
-      Mudis.reset!
-
-      metrics = Mudis.metrics
-      expect(metrics[:hits]).to eq(0)
-      expect(metrics[:misses]).to eq(0)
-      expect(metrics[:evictions]).to eq(0)
-      expect(metrics[:rejected]).to eq(0)
-      expect(Mudis.current_memory_bytes).to eq(0)
-      expect(Mudis.all_keys).to be_empty
-
-      # Optionally confirm reset_key is now gone
-      expect(Mudis.read("reset_key")).to be_nil
-    end
-  end
-
-  describe ".reset_metrics!" do
-    it "resets only the metrics without clearing cache" do
-      Mudis.write("metrics_key", "value")
-      Mudis.read("metrics_key")  # generates :hits
-      Mudis.read("missing_key")  # generates :misses
-
-      expect(Mudis.metrics[:hits]).to eq(1)
-      expect(Mudis.metrics[:misses]).to eq(1)
-
-      Mudis.reset_metrics!
-
-      expect(Mudis.metrics[:hits]).to eq(0)
-      expect(Mudis.metrics[:misses]).to eq(0)
-      expect(Mudis.read("metrics_key")).to eq("value") # still exists
     end
   end
 end

@@ -39,6 +39,8 @@ class Mudis
   def self.clear: (String, ?namespace: String) -> void
   def self.replace: (String, untyped, ?expires_in: Integer, ?namespace: String) -> void
   def self.inspect: (String, ?namespace: String) -> Hash[Symbol, untyped]?
+  def self.keys: (?namespace: String) -> Array[String]
+  def self.clear_namespace: (?namespace: String) -> void
 
   # Introspection & management
   def self.metrics: () -> Hash[Symbol, untyped]

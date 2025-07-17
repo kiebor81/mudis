@@ -190,6 +190,28 @@ Mudis.least_touched(5)
 # => returns top 5 least accessed keys
 ```
 
+#### `Mudis.keys(namespace:)`
+
+Returns all keys for a given namespace.
+
+```ruby
+Mudis.write("u1", "alpha", namespace: "users")
+Mudis.write("u2", "beta", namespace: "users")
+
+Mudis.keys(namespace: "users")
+# => ["u1", "u2"]
+
+```
+
+#### `Mudis.clear_namespace(namespace:)`
+
+Deletes all keys within a namespace.
+
+```ruby
+Mudis.clear_namespace("users")
+Mudis.read("u1", namespace: "users") # => nil
+```
+
 ---
 
 ## Rails Service Integration
@@ -536,7 +558,7 @@ Mudis is not intended to be a general-purpose, distributed caching platform. You
 
 #### API Enhancements
 
-- [ ] bulk_read(keys, namespace:): Batch retrieval of multiple keys with a single method call
+- [x] bulk_read(keys, namespace:): Batch retrieval of multiple keys with a single method call
 
 #### Safety & Policy Controls
 
@@ -545,7 +567,7 @@ Mudis is not intended to be a general-purpose, distributed caching platform. You
 
 #### Debugging
 
-- [ ] clear_namespace(namespace): Remove all keys in a namespace in one call
+- [x] clear_namespace(namespace): Remove all keys in a namespace in one call
 
 ---
 

@@ -383,6 +383,30 @@ class Mudis # rubocop:disable Metrics/ClassLength
       keys
     end
 
+    # Returns all keys in a specific namespace
+    def keys(namespace:)
+      raise ArgumentError, "namespace is required" unless namespace
+
+      prefix = "#{namespace}:"
+      all_keys.select { |key| key.start_with?(prefix) }.map { |key| key.delete_prefix(prefix) }
+    end
+
+    # Clears all keys in a specific namespace
+    def clear_namespace(namespace:)
+      raise ArgumentError, "namespace is required" unless namespace
+
+      prefix = "#{namespace}:"
+      buckets.times do |idx|
+        mutex = @mutexes[idx]
+        store = @stores[idx]
+
+        mutex.synchronize do
+          keys_to_delete = store.keys.select { |key| key.start_with?(prefix) }
+          keys_to_delete.each { |key| evict_key(idx, key) }
+        end
+      end
+    end
+
     # Returns the least-touched keys across all buckets
     def least_touched(n = 10) # rubocop:disable Metrics/MethodLength,Naming/MethodParameterName
       keys_with_touches = []

@@ -123,4 +123,20 @@ Gemspec summary and description corrections.
 - Added metrics for touch times on keys
 - Added `least_touched` function to dev API and `metrics` result
 
+## [0.6.0]
+
+### Namespace Batch Functions
+
+- Added `keys(namespace:)` to return all keys in namespace
+- Added `clear_namespace(namespace:)` to erase all keys within the given namespace
+
+### Fixed Buckets
+
+- Found an issue where setting buckets would not take if Mudis was already initialised.
+- Setting `Mudis.buckets` now properly resets and re-initialises with a hot reload
+
+### Re-organised Specs
+
+- Split specs into separate files to minismize collisions and improve readability
+
 ---
