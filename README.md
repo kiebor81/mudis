@@ -1,6 +1,7 @@
 ![mudis_signet](design/mudis.png "Mudis")
 
 [![Gem Version](https://badge.fury.io/rb/mudis.svg?icon=si%3Arubygems&refresh=1&cachebust=0)](https://badge.fury.io/rb/mudis)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **Mudis** is a fast, thread-safe, in-memory, sharded LRU (Least Recently Used) cache for Ruby applications. Inspired by Redis, it provides value serialization, optional compression, per-key expiry, and metric tracking in a lightweight, dependency-free package that lives inside your Ruby process.
 
