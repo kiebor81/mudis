@@ -56,6 +56,17 @@ class MudisServer
         result = Mudis.fetch(key, expires_in: ttl, namespace: ns) { req[:fallback] }
         sock.puts(JSON.dump({ ok: true, value: result }))
 
+      when "metrics"
+        sock.puts(JSON.dump({ ok: true, value: Mudis.metrics }))
+
+      when "reset_metrics"
+        Mudis.reset_metrics!
+        sock.puts(JSON.dump({ ok: true }))
+        
+      when "reset"
+        Mudis.reset!
+        sock.puts(JSON.dump({ ok: true }))
+
       else
         sock.puts(JSON.dump({ ok: false, error: "unknown command: #{cmd}" }))
       end

@@ -139,4 +139,18 @@ Gemspec summary and description corrections.
 
 - Split specs into separate files to minismize collisions and improve readability
 
+## [0.7.0]
+
+### Inter-Process Caching (IPC Mode)
+
+- Introduced IPC Mode enabling shared caching across multiple processes (e.g., Puma cluster).
+- Added `MudisServer` and `MudisClient` for local UNIX-socket communication between workers.
+- Allows all processes to share a single in-memory Mudis instance without Redis or Memcached.
+- Maintains full support for TTL, compression, namespacing, metrics, and memory-limit settings.
+- Communication occurs over `/tmp/mudis.sock` using a lightweight JSON protocol.
+
+#### Proxy Support
+- Added optional `config/initializers/mudis_proxy.rb` allowing workers to continue calling the `Mudis` API seamlessly.
+- Proxied methods include: `read`, `write`, `delete`, `fetch`, `metrics`, `reset_metrics!`, `reset!`.
+
 ---

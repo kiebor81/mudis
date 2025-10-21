@@ -53,4 +53,16 @@ class MudisClient
     new_val
   end
 
+  def metrics
+    request(cmd: "metrics")
+  end
+
+  def reset_metrics!
+    request(cmd: "reset_metrics")
+  end
+
+  def reset!
+    request(cmd: "reset")
+  end
+
 end
