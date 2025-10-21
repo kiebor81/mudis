@@ -7,7 +7,7 @@
 
 It’s ideal for scenarios where performance and process-local caching are critical, and where a full Redis setup is overkill or otherwise not possible/desirable.
 
-Alternatively, Mudis can be upscaled with higher sharding and resources in a dedicated Rails app to provide a [Mudis server](#create-a-mudis-server).
+Alternatively, Mudis can be upscaled with higher sharding and resources in a dedicated Rails app to provide a [Mudis server](#create-a-mudis-web-cache-server).
 
 ### Why another Caching Gem?
 
@@ -544,7 +544,7 @@ end
 
 ---
 
-## Create a Mudis Server
+## Create a Mudis Web Cache Server
 
 ### Minimal Setup
 
