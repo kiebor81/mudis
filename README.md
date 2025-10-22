@@ -7,7 +7,44 @@
 
 It’s ideal for scenarios where performance and process-local caching are critical, and where a full Redis setup is overkill or otherwise not possible/desirable.
 
-Alternatively, Mudis can be upscaled with higher sharding and resources in a dedicated Rails app to provide a [Mudis server](#create-a-mudis-web-cache-server).
+Alternatively, Mudis can be upscaled with higher sharding and resources in a dedicated Rails app to provide a [Mudis Web Cache Server](#create-a-mudis-web-cache-server).
+
+---
+
+## Table of Contents
+
+- [Why Another Caching Gem?](#why-another-caching-gem)
+  - [Similar Gems](#similar-gems)
+  - [Feature / Function Comparison](#feature--function-comparison)
+- [Design](#design)
+  - [Internal Structure and Behaviour](#internal-structure-and-behaviour)
+  - [Write - Read - Eviction](#write---read---eviction)
+  - [Cache Key Lifecycle](#cache-key-lifecycle)
+- [Features](#features)
+- [Installation](#installation)
+- [Configuration (Rails)](#configuration-rails)
+- [Basic Usage](#basic-usage)
+  - [Developer Utilities](#developer-utilities)
+    - [`Mudis.reset!`](#mudisreset)
+    - [`Mudis.reset_metrics!`](#mudisreset_metrics)
+    - [`Mudis.least_touched`](#mudisleast_touched)
+    - [`Mudis.keys(namespace:)`](#mudiskeysnamespace)
+    - [`Mudis.clear_namespace(namespace:)`](#mudisclear_namespacenamespace)
+- [Rails Service Integration](#rails-service-integration)
+- [Metrics](#metrics)
+- [Advanced Configuration](#advanced-configuration)
+- [Benchmarks](#benchmarks)
+- [Graceful Shutdown](#graceful-shutdown)
+- [Known Limitations](#known-limitations)
+- [Inter-Process Caching (IPC Mode)](#inter-process-caching-ipc-mode)
+  - [Overview](#overview)
+  - [Setup (Puma / Rails)](#setup-puma--rails)
+- [Create a Mudis Web Cache Server](#create-a-mudis-web-cache-server)
+  - [Minimal Setup](#minimal-setup)
+- [Project Philosophy](#project-philosophy)
+- [Roadmap](#roadmap)
+
+---
 
 ### Why another Caching Gem?
 
@@ -650,7 +687,7 @@ The primary use cases are:
 
 Mudis is not intended to be a general-purpose, distributed caching platform. You are, however, welcome to build on top of Mudis if you want its functionality in such projects. E.g.,
 
-- mudis-server – expose Mudis via HTTP, web sockets, hooks, etc
+- mudis-web-cache-server – expose Mudis via HTTP, web sockets, hooks, etc
 - mudis-broker – distributed key routing layer for coordinating multiple Mudis nodes
 - mudis-activejob-store – adapter for using Mudis in job queues or retry buffers
 
