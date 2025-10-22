@@ -411,6 +411,7 @@ Mudis includes features that MemoryStore doesn’t:
 | Thread safety      | ✅ Bucket-level mutexes | ✅ Global mutex              |
 | Observability      | ✅         | ❌           |
 | Namespacing        | ✅           | ❌ Manual scoping        |
+| IPC Aware        | ✅ (if enabled) | ❌ Requires manual configuration and additional gems       |
 
 It will be down to the developer to decide if a fraction of a millisecond is worth
 
