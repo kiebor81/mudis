@@ -42,6 +42,7 @@ There are plenty out there, in various states of maintenance and in many shapes 
 | **Concurrency model**                  | ✅                | ❌                               | ✅              | ❌             | ❌             | ❌              |
 | **Maintenance level**                  | ✅                | ✅                               | ✅              | ⚠️            | ⚠️            | ⚠️             |
 | **Suitable for APIs or microservices** | ✅                | ⚠️ Limited                      | ✅              | ⚠️ Small apps | ⚠️ Small apps | ❌ |
+| **Inter-process Caching** | ✅                | ❌                     | ❌              | ❌ | ❌ | ❌ |
 
 ---
 
@@ -69,6 +70,7 @@ There are plenty out there, in various states of maintenance and in many shapes 
 - **Expiry Support**: Optional TTL per key with background cleanup thread.
 - **Compression**: Optional Zlib compression for large values.
 - **Metrics**: Tracks hits, misses, and evictions.
+- **IPC Mode**: Shared cross-process caching for multi-process aplications.
 
 ---
 
