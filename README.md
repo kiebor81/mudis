@@ -690,7 +690,7 @@ Example custom proxy:
 
 ```ruby
 # config/<<initializers|boot>>/mudis_proxy.rb
-unless defined?(MudisServer)
+if defined?($mudis) && $mudis
   class Mudis
     def self.read(*a, **k) = $mudis.read(*a, **k)
     def self.write(*a, **k) = $mudis.write(*a, **k)

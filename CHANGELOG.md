@@ -155,4 +155,12 @@ Gemspec summary and description corrections.
 - Added optional `mudis_proxy.rb` allowing workers to continue calling the `Mudis` API seamlessly.
 - Proxied methods include: `read`, `write`, `delete`, `fetch`, `metrics`, `reset_metrics!`, `reset!`.
 
+## [0.7.2]
+
+- Fix to proxy eager exit guards
+
+## [0.7.3]
+
+- Further fixes for IPC mode and the default embedded proxy guards
+
 ---

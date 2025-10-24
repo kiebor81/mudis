@@ -7,17 +7,20 @@
 #
 # The proxy will forward calls to `$mudis` (an instance of MudisClient)
 # if it is defined, otherwise fallback to standard in-process behaviour.
-#
-# Note that this file must be required *after* MudisClient and MudisServer
-# have been loaded, otherwise the proxy will not be activated.
 
-if defined?(MudisServer)
-  # In the master process — no proxy needed.
+require_relative "mudis"
+require_relative "mudis_client"
+
+# Note that this file must be required after MudisServer
+# has been loaded, otherwise the proxy will not be activated.
+
+unless defined?(MudisClient)
+  warn "[MudisProxy] MudisClient not loaded: proxy not activated"
   return
 end
 
-unless defined?(MudisClient)
-  warn "[MudisProxy] MudisClient not loaded — proxy not activated"
+unless defined?($mudis) && $mudis
+  warn "[MudisProxy] $mudis not set: proxy not activated"
   return
 end
 
@@ -30,3 +33,5 @@ class << Mudis
   def reset_metrics! = $mudis.reset_metrics! # rubocop:disable Style/GlobalVars
   def reset! = $mudis.reset! # rubocop:disable Style/GlobalVars
 end
+
+warn "[MudisProxy] Proxy activated: forwarding calls to $mudis"
