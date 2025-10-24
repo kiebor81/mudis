@@ -25,7 +25,7 @@ Before submitting an issue or pull request, please read the following:
 | In-process memory cache   | Multi-node or clustered caches                            |
 | Observability features    | Built-in persistence or disk-based storage                |
 | Compression + serialization | Language-agnostic protocol support                      |
-| Namespacing, TTL, limits  | Background sync across nodes or processes                 |
+| Namespacing, TTL, limits  | Background sync across nodes                 |
 | Thread safety             | Network daemons or long-running cache servers             |
 
 If you're exploring a feature outside the scope, we recommend building on top of Mudis or forking to suit your architecture.
