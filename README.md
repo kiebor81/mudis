@@ -601,7 +601,7 @@ This design allows multiple workers to share the same cache without duplicating 
 
 ![mudis_ipc](design/mudis_ipc.png "Mudis IPC")
 
-### Setup (Puma / Rails)
+### Setup (Puma)
 
 Enable IPC mode by adding the following to your Puma configuration:
 
@@ -613,7 +613,7 @@ before_fork do
   require "mudis"
   require "mudis_server"
 
-  # Your typical Mudis configuration (previously in a Rails initializer)
+  # typical Mudis configuration
   Mudis.configure do |c|
     c.serializer = JSON
     c.compress = true
@@ -634,10 +634,10 @@ on_worker_boot do
 end
 ```
 
-Adding this Proxy to initializers allows seamless use of the API as documented. 
+Adding this Proxy to `initializers` (Rails) or `boot` (Hanami) allows seamless use of the API as documented. 
 
 ```ruby
-# config/initializers/mudis_proxy.rb
+# config/<<initializers|boot>>/mudis_proxy.rb
 unless defined?(MudisServer)
   class Mudis
     def self.read(*a, **k) = $mudis.read(*a, **k)
