@@ -19,7 +19,7 @@ unless defined?(MudisClient)
   return
 end
 
-unless defined?($mudis) && $mudis
+unless defined?($mudis) && $mudis # rubocop:disable Style/GlobalVars
   warn "[MudisProxy] $mudis not set: proxy not activated"
   return
 end
