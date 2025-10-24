@@ -1,0 +1,7 @@
+class MudisServer
+  SOCKET_PATH: String
+
+  def self.start!: () -> void
+
+  def self.handle_client: (sock: UNIXSocket) -> void
+end
