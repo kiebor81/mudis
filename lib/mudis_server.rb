@@ -1,12 +1,14 @@
 # frozen_string_literal: true
+
 require "socket"
 require "json"
 require_relative "mudis"
 
+# Simple UNIX socket server for handling Mudis operations via IPC mode
 class MudisServer
   SOCKET_PATH = "/tmp/mudis.sock"
 
-  def self.start!
+  def self.start! # rubocop:disable Metrics/MethodLength
     # Clean up old socket if it exists
     File.unlink(SOCKET_PATH) if File.exist?(SOCKET_PATH)
 
@@ -24,7 +26,7 @@ class MudisServer
     end
   end
 
-  def self.handle_client(sock)
+  def self.handle_client(sock) # rubocop:disable Metrics/CyclomaticComplexity,Metrics/AbcSize,Metrics/MethodLength
     request_line = sock.gets
     return unless request_line
 
@@ -62,7 +64,7 @@ class MudisServer
       when "reset_metrics"
         Mudis.reset_metrics!
         sock.puts(JSON.dump({ ok: true }))
-        
+
       when "reset"
         Mudis.reset!
         sock.puts(JSON.dump({ ok: true }))
@@ -70,7 +72,7 @@ class MudisServer
       else
         sock.puts(JSON.dump({ ok: false, error: "unknown command: #{cmd}" }))
       end
-    rescue => e
+    rescue StandardError => e
       sock.puts(JSON.dump({ ok: false, error: e.message }))
     ensure
       sock.close

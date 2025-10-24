@@ -1,7 +1,9 @@
 # frozen_string_literal: true
+
 require "socket"
 require "json"
 
+# thread-safe client for communicating with the MudisServer via UNIX socket.
 class MudisClient
   SOCKET_PATH = "/tmp/mudis.sock"
 
@@ -9,23 +11,19 @@ class MudisClient
     @mutex = Mutex.new
   end
 
-  def request(payload)
+  def request(payload) # rubocop:disable Metrics/MethodLength
     @mutex.synchronize do
       UNIXSocket.open(SOCKET_PATH) do |sock|
         sock.puts(JSON.dump(payload))
         response = sock.gets
         res = JSON.parse(response, symbolize_names: true)
-        raise res[:error] unless res[:ok]
+        raise res[:error] unless res[:ok] # rubocop:disable Layout/EmptyLineAfterGuardClause
         res[:value]
-        
       end
-
     rescue Errno::ENOENT
       warn "[MudisClient] Socket missing; master likely not running MudisServer"
       nil
-
     end
-
   end
 
   def read(key, namespace: nil)
@@ -64,5 +62,4 @@ class MudisClient
   def reset!
     request(cmd: "reset")
   end
-
 end

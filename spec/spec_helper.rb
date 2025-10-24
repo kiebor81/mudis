@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
+require "climate_control"
+
 require_relative "../lib/mudis"
+require_relative "../lib/mudis_client"
+require_relative "../lib/mudis_server"
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure
