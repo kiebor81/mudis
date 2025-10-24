@@ -415,6 +415,8 @@ cache.fetch(expires_in: 60) { expensive_query }
 cache.inspect_meta               # => { key: "users:user:42:profile", ... }
 ```
 
+*This pattern can also be applied in Hanami services using the registered Mudis dependency*
+
 ---
 
 ## Metrics
@@ -442,7 +444,9 @@ Mudis.metrics
 
 ```
 
-Optionally, return these metrics from a controller for remote analysis and monitoring if using Rails.
+Optionally, expose Mudis metrics from a controller or action for remote analysis and monitoring.
+
+**Rails:**
 
 ```ruby
 class MudisController < ApplicationController
@@ -450,6 +454,49 @@ class MudisController < ApplicationController
     render json: { mudis: Mudis.metrics }
   end
 
+end
+```
+
+**Hanami:**
+
+*Mudis Registered in the container*
+
+```ruby
+# apps/main/actions/metrics/show.rb
+module Main::Actions::Metrics
+  class Show < Main::Action
+    include Deps[cache: "cache"]
+
+    def handle(*, res)
+      res.format = :json
+      res.body = { mudis: cache.metrics }.to_json
+    end
+  end
+end
+```
+
+*Mudis not registered in the container*
+
+```ruby
+# apps/main/actions/metrics/show.rb
+module Main::Actions::Metrics
+  class Show < Main::Action
+    def handle(*, res)
+      res.format = :json
+      res.body = { mudis: Mudis.metrics }.to_json
+    end
+  end
+end
+```
+
+```ruby
+# config/routes.rb
+module Main
+  class Routes < Hanami::Routes
+    root { "OK" }
+
+    get "/metrics", to: "metrics.show"
+  end
 end
 ```
 
