@@ -7,10 +7,9 @@
 #
 # The proxy will forward calls to `$mudis` (an instance of MudisClient)
 # if it is defined, otherwise fallback to standard in-process behaviour.
-
-require_relative "mudis"
-require_relative "mudis_server"
-require_relative "mudis_client"
+#
+# Note that this file must be required *after* MudisClient and MudisServer
+# have been loaded, otherwise the proxy will not be activated.
 
 if defined?(MudisServer)
   # In the master process — no proxy needed.
