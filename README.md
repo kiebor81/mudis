@@ -682,9 +682,11 @@ on_worker_boot do
 end
 ```
 
-For more granular control over Mudis, adding the Proxy manually to `initializers` (Rails) or `boot` (Hanami) allows seamless use of the API as documented. 
+For more granular control over Mudis, adding a custom Proxy manually to `initializers` (Rails) or `boot` (Hanami) allows seamless use of the API as documented. 
 
 **Do not require `mudis_proxy` if following this method**
+
+Example custom proxy:
 
 ```ruby
 # config/<<initializers|boot>>/mudis_proxy.rb
