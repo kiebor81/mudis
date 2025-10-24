@@ -9,6 +9,8 @@ It’s ideal for scenarios where performance and process-local caching are criti
 
 Alternatively, Mudis can be upscaled with higher sharding and resources in a dedicated Rails app to provide a [Mudis Web Cache Server](#create-a-mudis-web-cache-server).
 
+Mudis also works naturally in Hanami because it’s a pure Ruby in-memory cache. Whether used as a singleton within a process or via IPC in cluster mode, it preserves Hanami’s lightweight and modular architecture.
+
 ---
 
 ## Table of Contents
@@ -23,6 +25,7 @@ Alternatively, Mudis can be upscaled with higher sharding and resources in a ded
 - [Features](#features)
 - [Installation](#installation)
 - [Configuration (Rails)](#configuration-rails)
+- [Configuration (Hanami)](#configuration-hanami)
 - [Basic Usage](#basic-usage)
   - [Developer Utilities](#developer-utilities)
     - [`Mudis.reset!`](#mudisreset)
@@ -160,6 +163,79 @@ Mudis.max_bytes = 1_073_741_824 # set maximum cache size
 Mudis.start_expiry_thread(interval: 60) # Cleanup every 60s
 
 ## set at exit hook
+```
+
+---
+
+## Configuration (Hanami)
+
+Mudis integrates seamlessly with [Hanami](https://hanamirb.org) applications. It provides the same configuration flexibility and thread-safe caching capabilities as in Rails, with minimal setup differences.
+
+Create a boot file:
+
+```ruby
+# config/boot/mudis.rb
+require "mudis"
+
+Mudis.configure do |c|
+  c.serializer = JSON
+  c.compress = true
+  c.max_value_bytes = 2_000_000
+  c.hard_memory_limit = true
+  c.max_bytes = 1_073_741_824
+end
+
+Mudis.start_expiry_thread(interval: 60)
+
+at_exit { Mudis.stop_expiry_thread }
+```
+
+Then require it from `config/app.rb`:
+
+```ruby
+# config/app.rb
+require_relative "./boot/mudis"
+
+module MyApp
+  class App < Hanami::App
+  end
+end
+```
+
+This ensures Mudis is initialized and available globally throughout your Hanami application in the same as it would in Rails.
+
+---
+
+### Using Mudis with Hanami’s Dependency Container
+
+You can register Mudis as a dependency in the Hanami container to access it via dependency injection:
+
+```ruby
+# config/container.rb
+require "mudis"
+
+MyApp::Container.register(:cache, Mudis)
+```
+
+Then use it inside your actions, repositories, or services:
+
+```ruby
+# apps/main/actions/users/show.rb
+module Main
+  module Actions
+    module Users
+      class Show < Main::Action
+        include Deps[cache: "cache"]
+
+        def handle(req, res)
+          res[:user] = cache.fetch("user:#{req.params[:id]}", expires_in: 60) do
+            UserRepo.new.find(req.params[:id])
+          end
+        end
+      end
+    end
+  end
+end
 ```
 
 ---
@@ -710,8 +786,8 @@ Mudis is not intended to be a general-purpose, distributed caching platform. You
 
 #### Refactor Mudis 
 
-- [ ] Review Mudis for improved readability and reduce complexity in top-level functions
-- [ ] Enhanced guards
+- [x] Review Mudis for improved readability and reduce complexity in top-level functions
+- [x] Enhanced guards
 - [ ] Review for functionality gaps and enhance as needed 
 
 ---
