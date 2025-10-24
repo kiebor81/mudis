@@ -41,7 +41,7 @@ Mudis also works naturally in Hanami because it’s a pure Ruby in-memory cache.
 - [Known Limitations](#known-limitations)
 - [Inter-Process Caching (IPC Mode)](#inter-process-caching-ipc-mode)
   - [Overview](#overview)
-  - [Setup (Puma / Rails)](#setup-puma--rails)
+  - [Setup (Puma)](#setup-puma)
 - [Create a Mudis Web Cache Server](#create-a-mudis-web-cache-server)
   - [Minimal Setup](#minimal-setup)
 - [Project Philosophy](#project-philosophy)
