@@ -149,8 +149,10 @@ Gemspec summary and description corrections.
 - Maintains full support for TTL, compression, namespacing, metrics, and memory-limit settings.
 - Communication occurs over `/tmp/mudis.sock` using a lightweight JSON protocol.
 
+## [0.7.1]
+
 #### Proxy Support
-- Added optional `config/initializers/mudis_proxy.rb` allowing workers to continue calling the `Mudis` API seamlessly.
+- Added optional `mudis_proxy.rb` allowing workers to continue calling the `Mudis` API seamlessly.
 - Proxied methods include: `read`, `write`, `delete`, `fetch`, `metrics`, `reset_metrics!`, `reset!`.
 
 ---

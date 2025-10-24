@@ -678,10 +678,13 @@ end
 on_worker_boot do
   require "mudis_client"
   $mudis = MudisClient.new
+  require "mudis_proxy" # optionally require the default mudis proxy to invisibly patch Mudis
 end
 ```
 
-Adding this Proxy to `initializers` (Rails) or `boot` (Hanami) allows seamless use of the API as documented. 
+For more granular control over Mudis, adding the Proxy manually to `initializers` (Rails) or `boot` (Hanami) allows seamless use of the API as documented. 
+
+**Do not require `mudis_proxy` if following this method**
 
 ```ruby
 # config/<<initializers|boot>>/mudis_proxy.rb
