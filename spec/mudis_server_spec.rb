@@ -6,6 +6,10 @@ require "json"
 require_relative "spec_helper"
 
 RSpec.describe MudisServer do # rubocop:disable Metrics/BlockLength
+  before(:all) do
+    skip "UNIX sockets not supported on Windows" if Gem.win_platform?
+  end
+
   let(:socket_path) { MudisServer::SOCKET_PATH }
 
   before do
