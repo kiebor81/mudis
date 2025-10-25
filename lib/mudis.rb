@@ -47,6 +47,11 @@ class Mudis # rubocop:disable Metrics/ClassLength
       self.max_ttl = config.max_ttl
       self.default_ttl = config.default_ttl
 
+      @persistence_enabled    = config.persistence_enabled
+      @persistence_path       = config.persistence_path
+      @persistence_format     = config.persistence_format
+      @persistence_safe_write = config.persistence_safe_write
+
       if config.buckets # rubocop:disable Style/GuardClause
         @buckets = config.buckets
         reset!
@@ -518,4 +523,109 @@ class Mudis # rubocop:disable Metrics/ClassLength
       [ttl, @max_ttl].min
     end
   end
+
+  class << self
+
+    # Saves the current cache state to disk for persistence
+    def save_snapshot!
+      return unless @persistence_enabled
+      data = snapshot_dump
+      safe_write_snapshot(data)
+    rescue => e
+      warn "[Mudis] Failed to save snapshot: #{e.class}: #{e.message}"
+    end
+
+    # Loads the cache state from disk for persistence
+    def load_snapshot!
+      return unless @persistence_enabled
+      return unless File.exist?(@persistence_path)
+      data = read_snapshot
+      snapshot_restore(data)
+    rescue => e
+      warn "[Mudis] Failed to load snapshot: #{e.class}: #{e.message}"
+    end
+
+    # Installs an at_exit hook to save the snapshot on process exit
+    def install_persistence_hook!
+      return unless @persistence_enabled
+      return if defined?(@persistence_hook_installed) && @persistence_hook_installed
+      at_exit { save_snapshot! }
+      @persistence_hook_installed = true
+    end
+  end
+
+  class << self
+    private
+    # Collect a JSON/Marshal-safe array of { key, value, expires_in }
+    def snapshot_dump
+      entries = []
+      now = Time.now
+      @buckets.times do |idx|
+        mutex = @mutexes[idx]
+        store = @stores[idx]
+        mutex.synchronize do
+          store.each do |key, raw|
+            exp_at = raw[:expires_at]
+            next if exp_at && now > exp_at
+            value = decompress_and_deserialize(raw[:value])
+            expires_in = exp_at ? (exp_at - now).to_i : nil
+            entries << { key: key, value: value, expires_in: expires_in }
+          end
+        end
+      end
+      entries
+    end
+
+    # Restore via existing write-path so LRU/limits/compression/TTL are honored
+    def snapshot_restore(entries)
+      return unless entries && !entries.empty?
+      entries.each do |e|
+        begin
+          write(e[:key], e[:value], expires_in: e[:expires_in])
+        rescue => ex
+          warn "[Mudis] Failed to restore key #{e[:key].inspect}: #{ex.message}"
+        end
+      end
+    end
+
+    # Serializer for snapshot persistence
+    # Defaults to Marshal if not JSON
+    def serializer_for_snapshot
+      (@persistence_format || :marshal).to_sym == :json ? JSON : :marshal
+    end
+
+    # Safely writes snapshot data to disk
+    # Uses safe write if configured
+    def safe_write_snapshot(data)
+      path = @persistence_path
+      dir = File.dirname(path)
+      Dir.mkdir(dir) unless Dir.exist?(dir)
+
+      payload =
+        if (@persistence_format || :marshal).to_sym == :json
+          serializer_for_snapshot.dump(data)
+        else
+          Marshal.dump(data)
+        end
+
+      if @persistence_safe_write
+        tmp = "#{path}.tmp-#{$$}-#{Thread.current.object_id}"
+        File.open(tmp, "wb") { |f| f.write(payload) }
+        File.rename(tmp, path)
+      else
+        File.open(path, "wb") { |f| f.write(payload) }
+      end
+    end
+
+    # Reads snapshot data from disk
+    # Uses safe read if configured
+    def read_snapshot
+      if (@persistence_format || :marshal).to_sym == :json
+        serializer_for_snapshot.load(File.binread(@persistence_path))
+      else
+        Marshal.load(File.binread(@persistence_path))
+      end
+    end
+  end
+
 end

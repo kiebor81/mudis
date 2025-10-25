@@ -1,3 +1,3 @@
 # frozen_string_literal: true
 
-MUDIS_VERSION = "0.7.3"
+MUDIS_VERSION = "0.8.0"

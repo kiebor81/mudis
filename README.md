@@ -36,12 +36,13 @@ Mudis also works naturally in Hanami because it’s a pure Ruby in-memory cache.
 - [Rails Service Integration](#rails-service-integration)
 - [Metrics](#metrics)
 - [Advanced Configuration](#advanced-configuration)
-- [Benchmarks](#benchmarks)
-- [Graceful Shutdown](#graceful-shutdown)
-- [Known Limitations](#known-limitations)
+- [Soft Persistence (Snapshots)](#soft-persistence-snapshots)
 - [Inter-Process Caching (IPC Mode)](#inter-process-caching-ipc-mode)
   - [Overview](#overview)
   - [Setup (Puma)](#setup-puma)
+- [Benchmarks](#benchmarks)
+- [Graceful Shutdown](#graceful-shutdown)
+- [Known Limitations](#known-limitations)
 - [Create a Mudis Web Cache Server](#create-a-mudis-web-cache-server)
   - [Minimal Setup](#minimal-setup)
 - [Project Philosophy](#project-philosophy)
@@ -528,6 +529,159 @@ When setting `serializer`, be mindful of the below
 
 ---
 
+## Soft Persistence (Snapshots)
+
+Mudis can optionally soft-persist its in-memory cache to disk between process restarts.  
+When enabled, it will automatically:
+
+- **Save** a snapshot of the current cache at shutdown  
+- **Reload** it on startup
+
+This feature is **off by default** and can be enabled via configuration.
+
+Example configuration:
+
+```ruby
+Mudis.configure do |config|
+  config.persistence_enabled = true
+  config.persistence_path = "tmp/mudis_snapshot.dump"
+  config.persistence_format = :marshal   # or :json
+  config.persistence_safe_write = true   # atomic temp write + rename
+end
+
+## Optionally install the exit hook manually (usually automatic)
+# Mudis.install_persistence_hook!
+```
+
+From your startup routine:
+
+```ruby
+# Restore snapshot on startup
+Mudis.load_snapshot!
+```
+
+*This feature works identically in Rails, Hanami, and standalone Ruby scripts, as long as `Mudis.configure` is called prior to `Mudis.load_snapshot!`.*
+
+### Behavior
+
+| Operation | Description |
+|------------|-------------|
+| `save_snapshot!` | Dumps all non-expired cache entries to disk. |
+| `load_snapshot!` | Reads snapshot and restores entries via normal write path. |
+| `install_persistence_hook!` | Registers an `at_exit` hook to automatically save on process exit. |
+
+#### Notes
+
+- Disabled by default for backward compatibility.  
+- Uses Ruby’s `Marshal` by default for fastest serialization; `:json` also supported.  
+- Respects TTLs: expired entries are never written to disk.  
+- Thread-safe: snapshots are taken under shard-level locks.  
+- Safe write: when `persistence_safe_write = true`, Mudis writes to a temp file and renames it atomically.
+
+#### Example Flow
+
+![mudis_persistence](design/mudis_persistence.png "Mudis Persistence Strategy")
+
+1. On startup, `Mudis.load_snapshot!` repopulates the cache.  
+2. Your app uses the cache as normal (`write`, `read`, `fetch`, etc.).  
+3. When the process exits, `at_exit` automatically triggers `save_snapshot!`.  
+4. A file (e.g., `tmp/mudis_snapshot.dump`) holds your persisted cache.
+
+#### Safety
+
+If the snapshot file is **missing** or **corrupted**, Mudis will:
+- Log a warning via `warn "[Mudis] Failed to load snapshot..."`, and  
+- Continue booting normally with an empty cache.
+
+---
+
+## Inter-Process Caching (IPC Mode)
+
+While Mudis was originally designed as an in-process cache, it can also operate as a shared inter-process cache when running in environments that use concurrent processes (such as Puma in cluster mode). This is achieved through a local UNIX socket server that allows all workers to access a single, centralized Mudis instance.
+
+### Overview
+
+In IPC mode, Mudis runs as a singleton server within the master process.
+
+Each worker connects to that server through a lightweight client (`MudisClient`) using a local UNIX domain socket (default: `/tmp/mudis.sock`).
+All cache operations, e.g., read, write, delete, fetch, etc., are transparently proxied to the master process, which holds the authoritative cache state.
+
+This design allows multiple workers to share the same cache without duplicating memory or losing synchronization, while retaining Mudis’ performance, configurability, and thread safety.
+
+| **Benefit**                       | **Description**                                                                          |
+| --------------------------------- | ---------------------------------------------------------------------------------------- |
+| **Shared Cache Across Processes** | All Puma workers share one Mudis instance via IPC.                                       |
+| **Zero External Dependencies**    | No Redis, Memcached, or separate daemon required.                                        |
+| **Memory Efficient**              | Cache data stored only once, not duplicated per worker.                                  |
+| **Full Feature Support**          | All Mudis features (TTL, compression, metrics, etc.) work transparently.                 |
+| **Safe & Local**                  | Communication is limited to the host system’s UNIX socket, ensuring isolation and speed. |
+
+![mudis_ipc](design/mudis_ipc.png "Mudis IPC")
+
+### Setup (Puma)
+
+Enable IPC mode by adding the following to your Puma configuration:
+
+```ruby
+# config/puma.rb
+preload_app!
+
+before_fork do
+  require "mudis"
+  require "mudis_server"
+
+  # typical Mudis configuration
+  Mudis.configure do |c|
+    c.serializer = JSON
+    c.compress = true
+    c.max_value_bytes = 2_000_000
+    c.hard_memory_limit = true
+    c.max_bytes = 1_073_741_824
+  end
+
+  Mudis.start_expiry_thread(interval: 60)
+  MudisServer.start!
+
+  at_exit { Mudis.stop_expiry_thread }
+end
+
+on_worker_boot do
+  require "mudis_client"
+  $mudis = MudisClient.new
+  require "mudis_proxy" # optionally require the default mudis proxy to invisibly patch Mudis
+end
+```
+
+For more granular control over Mudis, adding a custom Proxy manually to `initializers` (Rails) or `boot` (Hanami) allows seamless use of the API as documented. 
+
+**Do not require `mudis_proxy` if following this method**
+
+Example custom proxy:
+
+```ruby
+# config/<<initializers|boot>>/mudis_proxy.rb
+if defined?($mudis) && $mudis
+  class Mudis
+    def self.read(*a, **k) = $mudis.read(*a, **k)
+    def self.write(*a, **k) = $mudis.write(*a, **k)
+    def self.delete(*a, **k) = $mudis.delete(*a, **k)
+    def self.fetch(*a, **k, &b) = $mudis.fetch(*a, **k, &b)
+    def self.metrics = $mudis.metrics
+    def self.reset_metrics! = $mudis.reset_metrics!
+    def self.reset! = $mudis.reset!
+  end
+
+end
+```
+
+**Use IPC mode when:**
+
+- Running Rails or Rack apps under Puma cluster or multi-process background job workers.
+- You need cache consistency and memory efficiency without standing up Redis.
+- You want to preserve Mudis’s observability, configurability, and in-process simplicity at a larger scale.
+
+---
+
 ## Benchmarks
 
 #### Serializer(s)
@@ -620,95 +774,8 @@ at_exit { Mudis.stop_expiry_thread }
 
 ## Known Limitations
 
-- Data is **non-persistent**.
+- Data is **non-persistent**; only soft-persistence is optionally provided.
 - Compression introduces CPU overhead.
-
----
-
-## Inter-Process Caching (IPC Mode)
-
-While Mudis was originally designed as an in-process cache, it can also operate as a shared inter-process cache when running in environments that use concurrent processes (such as Puma in cluster mode). This is achieved through a local UNIX socket server that allows all workers to access a single, centralized Mudis instance.
-
-### Overview
-
-In IPC mode, Mudis runs as a singleton server within the master process.
-
-Each worker connects to that server through a lightweight client (`MudisClient`) using a local UNIX domain socket (default: `/tmp/mudis.sock`).
-All cache operations, e.g., read, write, delete, fetch, etc., are transparently proxied to the master process, which holds the authoritative cache state.
-
-This design allows multiple workers to share the same cache without duplicating memory or losing synchronization, while retaining Mudis’ performance, configurability, and thread safety.
-
-| **Benefit**                       | **Description**                                                                          |
-| --------------------------------- | ---------------------------------------------------------------------------------------- |
-| **Shared Cache Across Processes** | All Puma workers share one Mudis instance via IPC.                                       |
-| **Zero External Dependencies**    | No Redis, Memcached, or separate daemon required.                                        |
-| **Memory Efficient**              | Cache data stored only once, not duplicated per worker.                                  |
-| **Full Feature Support**          | All Mudis features (TTL, compression, metrics, etc.) work transparently.                 |
-| **Safe & Local**                  | Communication is limited to the host system’s UNIX socket, ensuring isolation and speed. |
-
-![mudis_ipc](design/mudis_ipc.png "Mudis IPC")
-
-### Setup (Puma)
-
-Enable IPC mode by adding the following to your Puma configuration:
-
-```ruby
-# config/puma.rb
-preload_app!
-
-before_fork do
-  require "mudis"
-  require "mudis_server"
-
-  # typical Mudis configuration
-  Mudis.configure do |c|
-    c.serializer = JSON
-    c.compress = true
-    c.max_value_bytes = 2_000_000
-    c.hard_memory_limit = true
-    c.max_bytes = 1_073_741_824
-  end
-
-  Mudis.start_expiry_thread(interval: 60)
-  MudisServer.start!
-
-  at_exit { Mudis.stop_expiry_thread }
-end
-
-on_worker_boot do
-  require "mudis_client"
-  $mudis = MudisClient.new
-  require "mudis_proxy" # optionally require the default mudis proxy to invisibly patch Mudis
-end
-```
-
-For more granular control over Mudis, adding a custom Proxy manually to `initializers` (Rails) or `boot` (Hanami) allows seamless use of the API as documented. 
-
-**Do not require `mudis_proxy` if following this method**
-
-Example custom proxy:
-
-```ruby
-# config/<<initializers|boot>>/mudis_proxy.rb
-if defined?($mudis) && $mudis
-  class Mudis
-    def self.read(*a, **k) = $mudis.read(*a, **k)
-    def self.write(*a, **k) = $mudis.write(*a, **k)
-    def self.delete(*a, **k) = $mudis.delete(*a, **k)
-    def self.fetch(*a, **k, &b) = $mudis.fetch(*a, **k, &b)
-    def self.metrics = $mudis.metrics
-    def self.reset_metrics! = $mudis.reset_metrics!
-    def self.reset! = $mudis.reset!
-  end
-
-end
-```
-
-**Use IPC mode when:**
-
-- Running Rails or Rack apps under Puma cluster or multi-process background job workers.
-- You need cache consistency and memory efficiency without standing up Redis.
-- You want to preserve Mudis’s observability, configurability, and in-process simplicity at a larger scale.
 
 ---
 

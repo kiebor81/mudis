@@ -163,4 +163,23 @@ Gemspec summary and description corrections.
 
 - Further fixes for IPC mode and the default embedded proxy guards
 
+## [0.8.0]
+
+### Updates to API
+- Mudis can now optionally soft-persist the in-memory cache to disk between process restarts.
+- Non-breaking API changes
+
+  - New configuration options:
+    - `persistence_enabled` enable/disable snapshot persistence (default: `false`)
+    - `persistence_path` file path for persisted snapshots (default: `tmp/mudis_snapshot.dump`)
+    - `persistence_format` choose between `:marshal` (default) or `:json`
+    - `persistence_safe_write` atomic write using temp file + rename (default: `true`)
+
+  - New helper methods:
+    - `Mudis.save_snapshot!` manually trigger snapshot save
+    - `Mudis.load_snapshot!` restore snapshot from disk
+    - `Mudis.install_persistence_hook!` registers an `at_exit` hook for automatic persistence
+
+- Expired keys are skipped during dump
+
 ---

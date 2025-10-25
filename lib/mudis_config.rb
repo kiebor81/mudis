@@ -10,7 +10,12 @@ class MudisConfig
                 :max_bytes,
                 :buckets,
                 :max_ttl,
-                :default_ttl
+                :default_ttl,
+                # Persistence settings
+                :persistence_enabled,
+                :persistence_path,
+                :persistence_format,
+                :persistence_safe_write
 
   def initialize
     @serializer = JSON                        # Default serialization strategy
@@ -21,5 +26,10 @@ class MudisConfig
     @buckets = nil                            # use nil to signal fallback to ENV or default
     @max_ttl = nil                            # Max TTL for cache entries (optional)
     @default_ttl = nil                        # Default TTL for cache entries (optional)
+    # Persistence settings
+    @persistence_enabled = false              # Whether persistence is enabled
+    @persistence_path = 'mudis_data'          # Default path for persistence files
+    @persistence_format = :json               # Default persistence file format
+    @persistence_safe_write = true            # Whether to use safe write for persistence
   end
 end
