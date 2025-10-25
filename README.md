@@ -9,7 +9,7 @@
 
 It’s ideal for scenarios where performance and process-local caching are critical, and where a full Redis setup is overkill or otherwise not possible/desirable.
 
-Alternatively, Mudis can be upscaled with higher sharding and resources in a dedicated Rails app to provide a [Mudis Web Cache Server](#create-a-mudis-web-cache-server).
+Alternatively, Mudis can be upscaled with higher sharding and resources in a dedicated Rails/Hanami/Roda/etc app to provide a [Mudis Web Cache Server](#create-a-mudis-web-cache-server).
 
 Mudis also works naturally in Hanami because it’s a pure Ruby in-memory cache. Whether used as a singleton within a process or via IPC in cluster mode, it preserves Hanami’s lightweight and modular architecture.
 
@@ -28,6 +28,9 @@ Mudis also works naturally in Hanami because it’s a pure Ruby in-memory cache.
 - [Installation](#installation)
 - [Configuration (Rails)](#configuration-rails)
 - [Configuration (Hanami)](#configuration-hanami)
+- [Start and Stop Exipry Thread](#start-and-stop-exipry-thread)
+  - [Starting Exipry Thread](#starting-exipry-thread)
+  - [Graceful Shutdown](#graceful-shutdown)
 - [Basic Usage](#basic-usage)
   - [Developer Utilities](#developer-utilities)
     - [`Mudis.reset!`](#mudisreset)
@@ -43,10 +46,8 @@ Mudis also works naturally in Hanami because it’s a pure Ruby in-memory cache.
   - [Overview](#overview)
   - [Setup (Puma)](#setup-puma)
 - [Benchmarks](#benchmarks)
-- [Graceful Shutdown](#graceful-shutdown)
 - [Known Limitations](#known-limitations)
 - [Create a Mudis Web Cache Server](#create-a-mudis-web-cache-server)
-  - [Minimal Setup](#minimal-setup)
 - [Project Philosophy](#project-philosophy)
 - [Roadmap](#roadmap)
 
@@ -239,6 +240,28 @@ module Main
     end
   end
 end
+```
+
+---
+
+## Start and Stop Exipry Thread
+
+The expiry thread is not triggered automatically when your application starts. You must add the start and stop in the respective process hooks.
+
+### Starting Exipry Thread
+
+To enable background expiration and removal, you must start the expiry thread at start up after configuration.
+
+```ruby
+Mudis.start_expiry_thread(interval: 60)
+```
+
+### Graceful Shutdown
+
+Don’t forget to stop the expiry thread in your exit hook when your app exits:
+
+```ruby
+at_exit { Mudis.stop_expiry_thread }
 ```
 
 ---
@@ -533,15 +556,14 @@ When setting `serializer`, be mindful of the below
 
 ## Soft Persistence (Snapshots)
 
-Mudis can optionally soft-persist its in-memory cache to disk between process restarts.  
+Originally, Mudis was not designed to provide any form of persistence. But I recently had a situation where warm data recovery post-crash reboot was necessary.This could be achieved with a parallel service or peripheral worker, but I decided instead to address this challenge for my own purposes by expanding Mudis to optionally soft-persist its in-memory cache to disk between process restarts.
+
 When enabled, it will automatically:
 
 - **Save** a snapshot of the current cache at shutdown  
 - **Reload** it on startup
 
-This feature is **off by default** and can be enabled via configuration.
-
-Example configuration:
+This feature is **off by default** to preserve existing configurations and can be enabled as below:
 
 ```ruby
 Mudis.configure do |config|
@@ -599,7 +621,7 @@ If the snapshot file is **missing** or **corrupted**, Mudis will:
 
 ## Inter-Process Caching (IPC Mode)
 
-While Mudis was originally designed as an in-process cache, it can also operate as a shared inter-process cache when running in environments that use concurrent processes (such as Puma in cluster mode). This is achieved through a local UNIX socket server that allows all workers to access a single, centralized Mudis instance.
+While Mudis was originally designed as an in-process cache, it can also operate as a shared inter-process cache when running in environments that use concurrent processes (such as Puma in cluster mode). This is achieved through a local UNIX socket server that allows all workers to access a single, centralized Mudis instance. When running otherwise as a per process (worker) singleton you may encounter oddities or duplicate cache data.
 
 ### Overview
 
@@ -644,6 +666,8 @@ before_fork do
   Mudis.start_expiry_thread(interval: 60)
   MudisServer.start!
 
+  ## any start up services or background workers 
+  # which require the cache should be started here
   at_exit { Mudis.stop_expiry_thread }
 end
 
@@ -651,6 +675,7 @@ on_worker_boot do
   require "mudis_client"
   $mudis = MudisClient.new
   require "mudis_proxy" # optionally require the default mudis proxy to invisibly patch Mudis
+
 end
 ```
 
@@ -764,19 +789,10 @@ _10000 iterations of 512KB, JSON, compression ON_
 
 ---
 
-## Graceful Shutdown
-
-Don’t forget to stop the expiry thread when your app exits:
-
-```ruby
-at_exit { Mudis.stop_expiry_thread }
-```
-
----
-
 ## Known Limitations
 
 - Data is **non-persistent**; only soft-persistence is optionally provided.
+- No SQL or equivallent query interface for cached data. Data is per Key retrieval only.
 - Compression introduces CPU overhead.
 
 ---
@@ -784,6 +800,8 @@ at_exit { Mudis.stop_expiry_thread }
 ## Create a Mudis Web Cache Server
 
 ### Minimal Setup
+
+#### Example using Rails
 
 - Create a new Rails API app:
 
