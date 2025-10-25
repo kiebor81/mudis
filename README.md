@@ -87,6 +87,7 @@ There are plenty out there, in various states of maintenance and in many shapes 
 | **Maintenance level**                  | ✅                | ✅                               | ✅              | ⚠️            | ⚠️            | ⚠️             |
 | **Suitable for APIs or microservices** | ✅                | ⚠️ Limited                      | ✅              | ⚠️ Small apps | ⚠️ Small apps | ❌ |
 | **Inter-process Caching** | ✅                | ❌                     | ❌              | ❌ | ❌ | ❌ |
+| **Warm boot data snapshot** | ✅                | ❌                     | ❌              | ❌ | ❌ | ❌ |
 
 ---
 
@@ -115,6 +116,7 @@ There are plenty out there, in various states of maintenance and in many shapes 
 - **Compression**: Optional Zlib compression for large values.
 - **Metrics**: Tracks hits, misses, and evictions.
 - **IPC Mode**: Shared cross-process caching for multi-process aplications.
+- **Soft-persistence**: Data snapshot and reload.
 
 ---
 
