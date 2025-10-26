@@ -20,6 +20,8 @@ class Mudis # rubocop:disable Metrics/ClassLength
   @max_ttl = nil                                # Optional maximum TTL for cache entries
   @default_ttl = nil                            # Default TTL for cache entries if not specified
 
+  # --- Configuration Management ---
+
   class << self
     attr_accessor :serializer, :compress, :hard_memory_limit, :max_ttl, :default_ttl
     attr_reader :max_bytes, :max_value_bytes
@@ -171,6 +173,8 @@ class Mudis # rubocop:disable Metrics/ClassLength
   @threshold_bytes = (@max_bytes * 0.9).to_i # Eviction threshold at 90%
   @expiry_thread = nil # Background thread for expiry cleanup
   @hard_memory_limit = false # Whether to enforce hard memory cap
+
+  # --- Core Cache Operations ---
 
   class << self
     # Starts a thread that periodically removes expired entries
@@ -527,6 +531,8 @@ class Mudis # rubocop:disable Metrics/ClassLength
       [ttl, @max_ttl].min
     end
   end
+
+  # --- Persistence ---
 
   class << self
     # Saves the current cache state to disk for persistence

@@ -8,6 +8,21 @@ require_relative "mudis"
 class MudisServer
   SOCKET_PATH = "/tmp/mudis.sock"
 
+  # Define command handlers mapping
+  # Each command maps to a lambda that takes a request hash and performs the corresponding Mudis operation.
+  COMMANDS = {
+    "read"          => ->(r) { Mudis.read(r[:key], namespace: r[:namespace]) },
+    "write"         => ->(r) { Mudis.write(r[:key], r[:value], expires_in: r[:ttl], namespace: r[:namespace]) },
+    "delete"        => ->(r) { Mudis.delete(r[:key], namespace: r[:namespace]) },
+    "exists"        => ->(r) { Mudis.exists?(r[:key], namespace: r[:namespace]) },
+    "fetch"         => ->(r) { Mudis.fetch(r[:key], expires_in: r[:ttl], namespace: r[:namespace]) { r[:fallback] } },
+    "metrics"       => ->(_) { Mudis.metrics },
+    "reset_metrics" => ->(_) { Mudis.reset_metrics! },
+    "reset"         => ->(_) { Mudis.reset! }
+  }.freeze
+
+  # Start the MudisServer
+  # This will run in a separate thread and handle incoming client connections.
   def self.start! # rubocop:disable Metrics/MethodLength
     # Clean up old socket if it exists
     File.unlink(SOCKET_PATH) if File.exist?(SOCKET_PATH)
@@ -16,6 +31,8 @@ class MudisServer
     server.listen(128)
     puts "[MudisServer] Listening on #{SOCKET_PATH}"
 
+    # Accept connections in a separate thread
+    # This allows the server to handle multiple clients concurrently.
     Thread.new do
       loop do
         client = server.accept
@@ -26,56 +43,39 @@ class MudisServer
     end
   end
 
-  def self.handle_client(sock) # rubocop:disable Metrics/CyclomaticComplexity,Metrics/AbcSize,Metrics/MethodLength
-    request_line = sock.gets
-    return unless request_line
+  # Handle a single client connection
+  # Reads the request, processes it, and sends back the response
+  # @param socket [UNIXSocket] The client socket
+  # @return [void]
+  def self.handle_client(socket)
+    request = JSON.parse(socket.gets, symbolize_names: true)
+    return unless request
 
-    req = JSON.parse(request_line, symbolize_names: true)
-    cmd  = req[:cmd]
-    key  = req[:key]
-    ns   = req[:namespace]
-    val  = req[:value]
-    ttl  = req[:ttl]
-
-    begin
-      case cmd
-      when "read"
-        result = Mudis.read(key, namespace: ns)
-        sock.puts(JSON.dump({ ok: true, value: result }))
-
-      when "write"
-        Mudis.write(key, val, expires_in: ttl, namespace: ns)
-        sock.puts(JSON.dump({ ok: true }))
-
-      when "delete"
-        Mudis.delete(key, namespace: ns)
-        sock.puts(JSON.dump({ ok: true }))
-
-      when "exists"
-        sock.puts(JSON.dump({ ok: true, value: Mudis.exists?(key, namespace: ns) }))
-
-      when "fetch"
-        result = Mudis.fetch(key, expires_in: ttl, namespace: ns) { req[:fallback] }
-        sock.puts(JSON.dump({ ok: true, value: result }))
-
-      when "metrics"
-        sock.puts(JSON.dump({ ok: true, value: Mudis.metrics }))
-
-      when "reset_metrics"
-        Mudis.reset_metrics!
-        sock.puts(JSON.dump({ ok: true }))
-
-      when "reset"
-        Mudis.reset!
-        sock.puts(JSON.dump({ ok: true }))
-
-      else
-        sock.puts(JSON.dump({ ok: false, error: "unknown command: #{cmd}" }))
-      end
-    rescue StandardError => e
-      sock.puts(JSON.dump({ ok: false, error: e.message }))
-    ensure
-      sock.close
-    end
+    response = process_request(request)
+    write_response(socket, ok: true, value: response)
+  rescue StandardError => e
+    write_response(socket, ok: false, error: e.message)
+  ensure
+    socket.close
   end
+
+  # Process a request hash and return the result
+  # Raises an error if the command is unknown
+  # @param req [Hash] The request hash containing :cmd and other parameters
+  # @return [Object] The result of the command execution
+  def self.process_request(req)
+    handler = COMMANDS[req[:cmd]]
+    raise "Unknown command: #{req[:cmd]}" unless handler
+
+    handler.call(req)
+  end
+
+  # Write a response to the client socket
+  # @param socket [UNIXSocket] The client socket
+  # @param payload [Hash] The response payload
+  # @return [void]
+  def self.write_response(socket, payload)
+    socket.puts(JSON.dump(payload))
+  end
+
 end

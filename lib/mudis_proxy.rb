@@ -24,6 +24,8 @@ unless defined?($mudis) && $mudis # rubocop:disable Style/GlobalVars
   return
 end
 
+# --- Proxy method forwarding ---
+
 class << Mudis
   def read(*a, **k) = $mudis.read(*a, **k) # rubocop:disable Naming/MethodParameterName,Style/GlobalVars
   def write(*a, **k) = $mudis.write(*a, **k) # rubocop:disable Naming/MethodParameterName,Style/GlobalVars
