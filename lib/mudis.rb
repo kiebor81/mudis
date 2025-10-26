@@ -525,13 +525,13 @@ class Mudis # rubocop:disable Metrics/ClassLength
   end
 
   class << self
-
     # Saves the current cache state to disk for persistence
     def save_snapshot!
       return unless @persistence_enabled
+
       data = snapshot_dump
       safe_write_snapshot(data)
-    rescue => e
+    rescue StandardError => e
       warn "[Mudis] Failed to save snapshot: #{e.class}: #{e.message}"
     end
 
@@ -539,9 +539,10 @@ class Mudis # rubocop:disable Metrics/ClassLength
     def load_snapshot!
       return unless @persistence_enabled
       return unless File.exist?(@persistence_path)
+
       data = read_snapshot
       snapshot_restore(data)
-    rescue => e
+    rescue StandardError => e
       warn "[Mudis] Failed to load snapshot: #{e.class}: #{e.message}"
     end
 
@@ -549,6 +550,7 @@ class Mudis # rubocop:disable Metrics/ClassLength
     def install_persistence_hook!
       return unless @persistence_enabled
       return if defined?(@persistence_hook_installed) && @persistence_hook_installed
+
       at_exit { save_snapshot! }
       @persistence_hook_installed = true
     end
@@ -556,8 +558,9 @@ class Mudis # rubocop:disable Metrics/ClassLength
 
   class << self
     private
+
     # Collect a JSON/Marshal-safe array of { key, value, expires_in }
-    def snapshot_dump
+    def snapshot_dump # rubocop:disable Metrics/MethodLength
       entries = []
       now = Time.now
       @buckets.times do |idx|
@@ -567,6 +570,7 @@ class Mudis # rubocop:disable Metrics/ClassLength
           store.each do |key, raw|
             exp_at = raw[:expires_at]
             next if exp_at && now > exp_at
+
             value = decompress_and_deserialize(raw[:value])
             expires_in = exp_at ? (exp_at - now).to_i : nil
             entries << { key: key, value: value, expires_in: expires_in }
@@ -579,10 +583,11 @@ class Mudis # rubocop:disable Metrics/ClassLength
     # Restore via existing write-path so LRU/limits/compression/TTL are honored
     def snapshot_restore(entries)
       return unless entries && !entries.empty?
+
       entries.each do |e|
-        begin
+        begin # rubocop:disable Style/RedundantBegin
           write(e[:key], e[:value], expires_in: e[:expires_in])
-        rescue => ex
+        rescue StandardError => ex
           warn "[Mudis] Failed to restore key #{e[:key].inspect}: #{ex.message}"
         end
       end
@@ -596,7 +601,7 @@ class Mudis # rubocop:disable Metrics/ClassLength
 
     # Safely writes snapshot data to disk
     # Uses safe write if configured
-    def safe_write_snapshot(data)
+    def safe_write_snapshot(data) # rubocop:disable Metrics/MethodLength
       path = @persistence_path
       dir = File.dirname(path)
       Dir.mkdir(dir) unless Dir.exist?(dir)
@@ -627,5 +632,4 @@ class Mudis # rubocop:disable Metrics/ClassLength
       end
     end
   end
-
 end

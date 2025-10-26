@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require "spec_helper"
 require "fileutils"
 
@@ -30,7 +31,7 @@ RSpec.describe "Mudis soft persistence" do
 
   it "does nothing when file missing" do
     Mudis.reset!
-    Mudis.configure { |c| c.persistence_enabled = true; c.persistence_path = path }
+    Mudis.configure { |c| c.persistence_enabled = true; c.persistence_path = path } # rubocop:disable Style/Semicolon
     Mudis.load_snapshot! # no file
     expect(Mudis.read("any")).to be_nil
   end

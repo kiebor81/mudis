@@ -17,7 +17,7 @@ class MudisConfig
                 :persistence_format,
                 :persistence_safe_write
 
-  def initialize
+  def initialize # rubocop:disable Metrics/MethodLength
     @serializer = JSON                        # Default serialization strategy
     @compress = false                         # Whether to compress values with Zlib
     @max_value_bytes = nil                    # Max size per value (optional)
@@ -28,7 +28,7 @@ class MudisConfig
     @default_ttl = nil                        # Default TTL for cache entries (optional)
     # Persistence settings
     @persistence_enabled = false              # Whether persistence is enabled
-    @persistence_path = 'mudis_data'          # Default path for persistence files
+    @persistence_path = "mudis_data"          # Default path for persistence files
     @persistence_format = :json               # Default persistence file format
     @persistence_safe_write = true            # Whether to use safe write for persistence
   end
