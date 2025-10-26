@@ -182,4 +182,8 @@ Gemspec summary and description corrections.
 
 - Expired keys are skipped during dump
 
+## [0.8.1]
+
+- Fixed missing clause to enable `install_persistence_hook` automatically.
+
 ---

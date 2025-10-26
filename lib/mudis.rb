@@ -52,10 +52,14 @@ class Mudis # rubocop:disable Metrics/ClassLength
       @persistence_format     = config.persistence_format
       @persistence_safe_write = config.persistence_safe_write
 
-      if config.buckets # rubocop:disable Style/GuardClause
+      if config.buckets
         @buckets = config.buckets
         reset!
       end
+
+      return unless @persistence_enabled
+
+      install_persistence_hook!
     end
 
     # Validates the current configuration, raising errors for invalid settings
@@ -628,7 +632,8 @@ class Mudis # rubocop:disable Metrics/ClassLength
       if (@persistence_format || :marshal).to_sym == :json
         serializer_for_snapshot.load(File.binread(@persistence_path))
       else
-        Marshal.load(File.binread(@persistence_path))
+        ## safe to use Marshal here as we control the file
+        Marshal.load(File.binread(@persistence_path)) # rubocop:disable Security/MarshalLoad
       end
     end
   end
