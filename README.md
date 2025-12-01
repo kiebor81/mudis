@@ -27,7 +27,7 @@ Mudis also works naturally in Hanami because it’s a pure Ruby in-memory cache.
   - [Cache Key Lifecycle](#cache-key-lifecycle)
 - [Features](#features)
 - [Installation](#installation)
-- [Configuration (Rails)](#configuration-rails)
+- [Configuration (Ruby/Rails)](#configuration-ruby-rails)
 - [Configuration (Hanami)](#configuration-hanami)
 - [Start and Stop Exipry Thread](#start-and-stop-exipry-thread)
   - [Starting Exipry Thread](#starting-exipry-thread)
@@ -134,15 +134,13 @@ Or install it manually:
 ```bash
 gem install mudis
 ```
-
 ---
 
-## Configuration (Rails)
+## Configuration (Ruby/Rails)
 
-In your Rails app, create an initializer:
+In your Rails app, create an initializer (in your entry point if using Ruby outside of Rails):
 
 ```ruby
-# config/initializers/mudis.rb
 Mudis.configure do |c|
   c.serializer = JSON        # or Marshal | Oj
   c.compress = true          # Compress values using Zlib
@@ -277,8 +275,14 @@ require 'mudis'
 # Write a value with optional TTL
 Mudis.write('user:123', { name: 'Alice' }, expires_in: 600)
 
+# Write a value with explicit namespace separation
+Mudis.write('123', { name: 'Alice' }, expires_in: 600, namespace:'user')
+
 # Read it back
 Mudis.read('user:123') # => { "name" => "Alice" }
+
+# Read back from namespace
+Mudis.read('123', namespace:'user') # => { "name" => "Alice" }
 
 # Check if it exists
 Mudis.exists?('user:123') # => true
