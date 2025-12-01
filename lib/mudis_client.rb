@@ -2,32 +2,44 @@
 
 require "socket"
 require "json"
+require_relative "mudis_ipc_config"
 
-# thread-safe client for communicating with the MudisServer via UNIX socket.
+# Thread-safe client for communicating with the MudisServer
+# Automatically uses UNIX sockets on Linux/macOS and TCP on Windows
 class MudisClient
-  SOCKET_PATH = "/tmp/mudis.sock"
+  include MudisIPCConfig
 
   def initialize
     @mutex = Mutex.new
   end
 
+  # Open a connection to the server (TCP or UNIX)
+  def open_connection
+    if MudisIPCConfig.use_tcp?
+      TCPSocket.new(TCP_HOST, TCP_PORT)
+    else
+      UNIXSocket.open(SOCKET_PATH)
+    end
+  end
+
   # Send a request to the MudisServer and return the response
   # @param payload [Hash] The request payload
   # @return [Object] The response value from the server
-  def request(payload) # rubocop:disable Metrics/MethodLength
+  def request(payload) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
     @mutex.synchronize do
-      UNIXSocket.open(SOCKET_PATH) do |sock|
-        sock.puts(JSON.dump(payload))
-        response = sock.gets
-        return nil unless response
+      sock = open_connection
+      sock.puts(JSON.dump(payload))
+      response = sock.gets
+      sock.close
 
-        res = JSON.parse(response, symbolize_names: true)
-        raise res[:error] unless res[:ok]
+      return nil unless response
 
-        res[:value]
-      end
-    rescue Errno::ENOENT
-      warn "[MudisClient] Socket missing. MudisServer may not be running"
+      res = JSON.parse(response, symbolize_names: true)
+      raise res[:error] unless res[:ok]
+
+      res[:value]
+    rescue Errno::ENOENT, Errno::ECONNREFUSED
+      warn "[MudisClient] Cannot connect to MudisServer. Is it running?"
       nil
     rescue JSON::ParserError
       warn "[MudisClient] Invalid JSON response from server"
@@ -87,6 +99,7 @@ class MudisClient
 
   private
 
+  # Helper to send a command with options
   def command(cmd, **opts)
     request({ cmd:, **opts })
   end

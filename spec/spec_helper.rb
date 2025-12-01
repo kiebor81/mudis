@@ -4,8 +4,7 @@ require "simplecov"
 SimpleCov.start do
   add_filter "/spec/"
   add_filter "/tmp/"
-  add_filter "lib/mudis_server.rb" if Gem.win_platform?
-  add_filter "lib/mudis_client.rb" if Gem.win_platform?
+  # IPC mode now works on Windows via TCP fallback - no need to exclude
 end
 
 require "climate_control"

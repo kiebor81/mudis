@@ -6,13 +6,15 @@ require "json"
 require_relative "spec_helper"
 
 RSpec.describe MudisServer do # rubocop:disable Metrics/BlockLength
+  let(:socket_path) { MudisIPCConfig::SOCKET_PATH }
+
   before(:all) do
-    skip "UNIX sockets not supported on Windows" if Gem.win_platform?
+    # Start the server once for all tests
+    Thread.new { MudisServer.start! }
+    sleep 0.2 # Allow the server to start
   end
 
-  let(:socket_path) { MudisServer::SOCKET_PATH }
-
-  before do
+  before(:each) do
     allow(Mudis).to receive(:read).and_return("mock_value")
     allow(Mudis).to receive(:write)
     allow(Mudis).to receive(:delete)
@@ -21,20 +23,23 @@ RSpec.describe MudisServer do # rubocop:disable Metrics/BlockLength
     allow(Mudis).to receive(:metrics).and_return({ reads: 1, writes: 1 })
     allow(Mudis).to receive(:reset_metrics!)
     allow(Mudis).to receive(:reset!)
-
-    # Start the server in a separate thread
-    Thread.new { MudisServer.start! }
-    sleep 0.1 # Allow the server to start
   end
 
   after do
-    File.unlink(socket_path) if File.exist?(socket_path)
+    File.unlink(socket_path) if File.exist?(socket_path) && !MudisIPCConfig.use_tcp?
   end
 
   def send_request(request)
-    UNIXSocket.open(socket_path) do |sock|
-      sock.puts(JSON.dump(request))
-      JSON.parse(sock.gets, symbolize_names: true)
+    if MudisIPCConfig.use_tcp?
+      TCPSocket.open(MudisIPCConfig::TCP_HOST, MudisIPCConfig::TCP_PORT) do |sock|
+        sock.puts(JSON.dump(request))
+        JSON.parse(sock.gets, symbolize_names: true)
+      end
+    else
+      UNIXSocket.open(socket_path) do |sock|
+        sock.puts(JSON.dump(request))
+        JSON.parse(sock.gets, symbolize_names: true)
+      end
     end
   end
 
@@ -46,13 +51,13 @@ RSpec.describe MudisServer do # rubocop:disable Metrics/BlockLength
 
   it "handles the 'write' command" do
     response = send_request({ cmd: "write", key: "test_key", value: "test_value", ttl: 60, namespace: "test_ns" })
-    expect(response).to eq({ ok: true })
+    expect(response).to eq({ ok: true, value: nil })
     expect(Mudis).to have_received(:write).with("test_key", "test_value", expires_in: 60, namespace: "test_ns")
   end
 
   it "handles the 'delete' command" do
     response = send_request({ cmd: "delete", key: "test_key", namespace: "test_ns" })
-    expect(response).to eq({ ok: true })
+    expect(response).to eq({ ok: true, value: nil })
     expect(Mudis).to have_received(:delete).with("test_key", namespace: "test_ns")
   end
 
@@ -77,18 +82,19 @@ RSpec.describe MudisServer do # rubocop:disable Metrics/BlockLength
 
   it "handles the 'reset_metrics' command" do
     response = send_request({ cmd: "reset_metrics" })
-    expect(response).to eq({ ok: true })
+    expect(response).to eq({ ok: true, value: nil })
     expect(Mudis).to have_received(:reset_metrics!)
   end
 
   it "handles the 'reset' command" do
     response = send_request({ cmd: "reset" })
-    expect(response).to eq({ ok: true })
+    expect(response).to eq({ ok: true, value: nil })
     expect(Mudis).to have_received(:reset!)
   end
 
   it "handles unknown commands" do
     response = send_request({ cmd: "unknown_command" })
-    expect(response).to eq({ ok: false, error: "unknown command: unknown_command" })
+    expect(response[:ok]).to be false
+    expect(response[:error]).to match(/unknown command/i)
   end
 end

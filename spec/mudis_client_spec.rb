@@ -3,8 +3,9 @@
 require_relative "spec_helper"
 
 RSpec.describe MudisClient do # rubocop:disable Metrics/BlockLength
-  let(:socket_path) { "/tmp/mudis.sock" }
-  let(:mock_socket) { instance_double(UNIXSocket) }
+  let(:socket_path) { MudisIPCConfig::SOCKET_PATH }
+  let(:socket_class) { MudisIPCConfig.use_tcp? ? TCPSocket : UNIXSocket }
+  let(:mock_socket) { instance_double(socket_class) }
   let(:client) { MudisClient.new }
 
   around do |example|
@@ -14,7 +15,12 @@ RSpec.describe MudisClient do # rubocop:disable Metrics/BlockLength
   end
 
   before do
-    allow(UNIXSocket).to receive(:open).and_yield(mock_socket)
+    if MudisIPCConfig.use_tcp?
+      allow(TCPSocket).to receive(:new).and_return(mock_socket)
+    else
+      allow(UNIXSocket).to receive(:open).and_yield(mock_socket)
+    end
+    allow(mock_socket).to receive(:close)
   end
 
   describe "#read" do
@@ -119,9 +125,13 @@ RSpec.describe MudisClient do # rubocop:disable Metrics/BlockLength
 
   describe "error handling" do
     it "warns when the socket is missing" do
-      allow(UNIXSocket).to receive(:open).and_raise(Errno::ENOENT)
+      if MudisIPCConfig.use_tcp?
+        allow(TCPSocket).to receive(:new).and_raise(Errno::ECONNREFUSED)
+      else
+        allow(UNIXSocket).to receive(:open).and_raise(Errno::ENOENT)
+      end
 
-      expect { client.read("test_key") }.to output(/Socket missing/).to_stderr
+      expect { client.read("test_key") }.to output(/Cannot connect/).to_stderr
       expect(client.read("test_key")).to be_nil
     end
 

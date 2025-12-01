@@ -3,10 +3,12 @@
 require "socket"
 require "json"
 require_relative "mudis"
+require_relative "mudis_ipc_config"
 
-# Simple UNIX socket server for handling Mudis operations via IPC mode
+# Socket server for handling Mudis operations via IPC mode
+# Automatically uses UNIX sockets on Linux/macOS and TCP on Windows
 class MudisServer
-  SOCKET_PATH = "/tmp/mudis.sock"
+  include MudisIPCConfig
 
   # Define command handlers mapping
   # Each command maps to a lambda that takes a request hash and performs the corresponding Mudis operation.
@@ -22,17 +24,35 @@ class MudisServer
   }.freeze
 
   # Start the MudisServer
+  # Automatically selects TCP on Windows, UNIX sockets elsewhere
   # This will run in a separate thread and handle incoming client connections.
-  def self.start! # rubocop:disable Metrics/MethodLength
-    # Clean up old socket if it exists
-    File.unlink(SOCKET_PATH) if File.exist?(SOCKET_PATH)
+  def self.start!
+    if MudisIPCConfig.use_tcp?
+      start_tcp_server!
+    else
+      start_unix_server!
+    end
+  end
 
+  # Start TCP server (for Windows or development)
+  def self.start_tcp_server!
+    warn "[MudisServer] Using TCP mode - recommended for development only"
+    server = TCPServer.new(TCP_HOST, TCP_PORT)
+    puts "[MudisServer] Listening on TCP #{TCP_HOST}:#{TCP_PORT}"
+    accept_connections(server)
+  end
+
+  # Start UNIX socket server (production mode for Linux/macOS)
+  def self.start_unix_server! # rubocop:disable Metrics/MethodLength
+    File.unlink(SOCKET_PATH) if File.exist?(SOCKET_PATH)
     server = UNIXServer.new(SOCKET_PATH)
     server.listen(128)
-    puts "[MudisServer] Listening on #{SOCKET_PATH}"
+    puts "[MudisServer] Listening on UNIX socket #{SOCKET_PATH}"
+    accept_connections(server)
+  end
 
-    # Accept connections in a separate thread
-    # This allows the server to handle multiple clients concurrently.
+  # Accept connections in a loop (works for both TCP and UNIX)
+  def self.accept_connections(server)
     Thread.new do
       loop do
         client = server.accept
@@ -45,7 +65,7 @@ class MudisServer
 
   # Handle a single client connection
   # Reads the request, processes it, and sends back the response
-  # @param socket [UNIXSocket] The client socket
+  # @param socket [Socket] The client socket (TCP or UNIX)
   # @return [void]
   def self.handle_client(socket)
     request = JSON.parse(socket.gets, symbolize_names: true)
@@ -71,11 +91,10 @@ class MudisServer
   end
 
   # Write a response to the client socket
-  # @param socket [UNIXSocket] The client socket
+  # @param socket [Socket] The client socket
   # @param payload [Hash] The response payload
   # @return [void]
   def self.write_response(socket, payload)
     socket.puts(JSON.dump(payload))
   end
-
 end
