@@ -70,7 +70,7 @@ rake coverage
 
 This will:
 - Execute all RSpec tests
-- Generate a coverage report (92%+ expected on non-Windows platforms)
+- Generate a coverage report (96%+ expected on non-Windows platforms)
 - Automatically open the HTML coverage report in your browser
 
 The coverage report is saved to `coverage/index.html` and shows line-by-line test coverage.

@@ -5,10 +5,21 @@ require "thread" # rubocop:disable Lint/RedundantRequireStatement
 require "zlib"
 
 require_relative "mudis_config"
+require_relative "mudis/lru"
+require_relative "mudis/persistence"
+require_relative "mudis/metrics"
+require_relative "mudis/namespace"
+require_relative "mudis/expiry"
 
 # Mudis is a thread-safe, in-memory, sharded, LRU cache with optional compression and expiry.
 # It is designed for high concurrency and performance within a Ruby application.
 class Mudis # rubocop:disable Metrics/ClassLength
+  extend LRU
+  extend Persistence
+  extend Metrics
+  extend Namespace
+  extend Expiry
+
   # --- Global Configuration and State ---
 
   @serializer = JSON                            # Default serializer (can be changed to Marshal or Oj)
@@ -78,35 +89,6 @@ class Mudis # rubocop:disable Metrics/ClassLength
       raise ArgumentError, "default_ttl must be > 0" if config.default_ttl && config.default_ttl <= 0
     end
 
-    # Returns a snapshot of metrics (thread-safe)
-    def metrics # rubocop:disable Metrics/MethodLength
-      @metrics_mutex.synchronize do
-        {
-          hits: @metrics[:hits],
-          misses: @metrics[:misses],
-          evictions: @metrics[:evictions],
-          rejected: @metrics[:rejected],
-          total_memory: current_memory_bytes,
-          least_touched: least_touched(10),
-          buckets: buckets.times.map do |idx|
-            {
-              index: idx,
-              keys: @stores[idx].size,
-              memory_bytes: @current_bytes[idx],
-              lru_size: @lru_nodes[idx].size
-            }
-          end
-        }
-      end
-    end
-
-    # Resets metric counters (thread-safe)
-    def reset_metrics!
-      @metrics_mutex.synchronize do
-        @metrics = { hits: 0, misses: 0, evictions: 0, rejected: 0 }
-      end
-    end
-
     # Fully resets all internal state (except config)
     def reset!
       stop_expiry_thread
@@ -140,17 +122,6 @@ class Mudis # rubocop:disable Metrics/ClassLength
     end
   end
 
-  # Node structure for the LRU doubly-linked list
-  class LRUNode
-    attr_accessor :key, :prev, :next
-
-    def initialize(key)
-      @key = key
-      @prev = nil
-      @next = nil
-    end
-  end
-
   # Number of cache buckets (shards). Default: 32
   def self.buckets
     return @buckets if @buckets
@@ -177,28 +148,6 @@ class Mudis # rubocop:disable Metrics/ClassLength
   # --- Core Cache Operations ---
 
   class << self
-    # Starts a thread that periodically removes expired entries
-    def start_expiry_thread(interval: 60)
-      return if @expiry_thread&.alive?
-
-      @stop_expiry = false
-      @expiry_thread = Thread.new do
-        loop do
-          break if @stop_expiry
-
-          sleep interval
-          cleanup_expired!
-        end
-      end
-    end
-
-    # Signals and joins the expiry thread
-    def stop_expiry_thread
-      @stop_expiry = true
-      @expiry_thread&.join
-      @expiry_thread = nil
-    end
-
     # Computes which bucket a key belongs to
     def bucket_index(key)
       key.hash % buckets
@@ -371,20 +320,6 @@ class Mudis # rubocop:disable Metrics/ClassLength
       end
     end
 
-    # Removes expired keys across all buckets
-    def cleanup_expired!
-      now = Time.now
-      buckets.times do |idx|
-        mutex = @mutexes[idx]
-        store = @stores[idx]
-        mutex.synchronize do
-          store.keys.each do |key| # rubocop:disable Style/HashEachMethods
-            evict_key(idx, key) if store[key][:expires_at] && now > store[key][:expires_at]
-          end
-        end
-      end
-    end
-
     # Returns an array of all cache keys
     def all_keys
       keys = []
@@ -394,30 +329,6 @@ class Mudis # rubocop:disable Metrics/ClassLength
         mutex.synchronize { keys.concat(store.keys) }
       end
       keys
-    end
-
-    # Returns all keys in a specific namespace
-    def keys(namespace:)
-      raise ArgumentError, "namespace is required" unless namespace
-
-      prefix = "#{namespace}:"
-      all_keys.select { |key| key.start_with?(prefix) }.map { |key| key.delete_prefix(prefix) }
-    end
-
-    # Clears all keys in a specific namespace
-    def clear_namespace(namespace:)
-      raise ArgumentError, "namespace is required" unless namespace
-
-      prefix = "#{namespace}:"
-      buckets.times do |idx|
-        mutex = @mutexes[idx]
-        store = @stores[idx]
-
-        mutex.synchronize do
-          keys_to_delete = store.keys.select { |key| key.start_with?(prefix) }
-          keys_to_delete.each { |key| evict_key(idx, key) }
-        end
-      end
     end
 
     # Returns the least-touched keys across all buckets
@@ -448,199 +359,12 @@ class Mudis # rubocop:disable Metrics/ClassLength
       @max_bytes
     end
 
-    # Executes a block with a specific namespace, restoring the old namespace afterwards
-    def with_namespace(namespace)
-      old_ns = Thread.current[:mudis_namespace]
-      Thread.current[:mudis_namespace] = namespace
-      yield
-    ensure
-      Thread.current[:mudis_namespace] = old_ns
-    end
-
     private
 
     # Decompresses and deserializes a raw value
     def decompress_and_deserialize(raw)
       val = compress ? Zlib::Inflate.inflate(raw) : raw
       serializer.load(val)
-    end
-
-    # Thread-safe metric increment
-    def metric(name)
-      @metrics_mutex.synchronize { @metrics[name] += 1 }
-    end
-
-    # Removes a key from storage and LRU
-    def evict_key(idx, key)
-      store = @stores[idx]
-      entry = store.delete(key)
-      return unless entry
-
-      @current_bytes[idx] -= (key.bytesize + entry[:value].bytesize)
-
-      node = @lru_nodes[idx].delete(key)
-      remove_node(idx, node) if node
-    end
-
-    # Inserts a key at the head of the LRU list
-    def insert_lru(idx, key)
-      node = LRUNode.new(key)
-      node.next = @lru_heads[idx]
-      @lru_heads[idx].prev = node if @lru_heads[idx]
-      @lru_heads[idx] = node
-      @lru_tails[idx] ||= node
-      @lru_nodes[idx][key] = node
-    end
-
-    # Promotes a key to the front of the LRU list
-    def promote_lru(idx, key)
-      node = @lru_nodes[idx][key]
-      return unless node && @lru_heads[idx] != node
-
-      remove_node(idx, node)
-      insert_lru(idx, key)
-    end
-
-    # Removes a node from the LRU list
-    def remove_node(idx, node)
-      if node.prev
-        node.prev.next = node.next
-      else
-        @lru_heads[idx] = node.next
-      end
-
-      if node.next
-        node.next.prev = node.prev
-      else
-        @lru_tails[idx] = node.prev
-      end
-    end
-
-    # Namespaces a key with an optional namespace
-    def namespaced_key(key, namespace = nil)
-      ns = namespace || Thread.current[:mudis_namespace]
-      ns ? "#{ns}:#{key}" : key
-    end
-
-    # Calculates the effective TTL for an entry, respecting max_ttl if set
-    def effective_ttl(expires_in)
-      ttl = expires_in || @default_ttl
-      return nil unless ttl
-      return ttl unless @max_ttl
-
-      [ttl, @max_ttl].min
-    end
-  end
-
-  # --- Persistence ---
-
-  class << self
-    # Saves the current cache state to disk for persistence
-    def save_snapshot!
-      return unless @persistence_enabled
-
-      data = snapshot_dump
-      safe_write_snapshot(data)
-    rescue StandardError => e
-      warn "[Mudis] Failed to save snapshot: #{e.class}: #{e.message}"
-    end
-
-    # Loads the cache state from disk for persistence
-    def load_snapshot!
-      return unless @persistence_enabled
-      return unless File.exist?(@persistence_path)
-
-      data = read_snapshot
-      snapshot_restore(data)
-    rescue StandardError => e
-      warn "[Mudis] Failed to load snapshot: #{e.class}: #{e.message}"
-    end
-
-    # Installs an at_exit hook to save the snapshot on process exit
-    def install_persistence_hook!
-      return unless @persistence_enabled
-      return if defined?(@persistence_hook_installed) && @persistence_hook_installed
-
-      at_exit { save_snapshot! }
-      @persistence_hook_installed = true
-    end
-  end
-
-  class << self
-    private
-
-    # Collect a JSON/Marshal-safe array of { key, value, expires_in }
-    def snapshot_dump # rubocop:disable Metrics/MethodLength
-      entries = []
-      now = Time.now
-      @buckets.times do |idx|
-        mutex = @mutexes[idx]
-        store = @stores[idx]
-        mutex.synchronize do
-          store.each do |key, raw|
-            exp_at = raw[:expires_at]
-            next if exp_at && now > exp_at
-
-            value = decompress_and_deserialize(raw[:value])
-            expires_in = exp_at ? (exp_at - now).to_i : nil
-            entries << { key: key, value: value, expires_in: expires_in }
-          end
-        end
-      end
-      entries
-    end
-
-    # Restore via existing write-path so LRU/limits/compression/TTL are honored
-    def snapshot_restore(entries)
-      return unless entries && !entries.empty?
-
-      entries.each do |e|
-        begin # rubocop:disable Style/RedundantBegin
-          write(e[:key], e[:value], expires_in: e[:expires_in])
-        rescue StandardError => ex
-          warn "[Mudis] Failed to restore key #{e[:key].inspect}: #{ex.message}"
-        end
-      end
-    end
-
-    # Serializer for snapshot persistence
-    # Defaults to Marshal if not JSON
-    def serializer_for_snapshot
-      (@persistence_format || :marshal).to_sym == :json ? JSON : :marshal
-    end
-
-    # Safely writes snapshot data to disk
-    # Uses safe write if configured
-    def safe_write_snapshot(data) # rubocop:disable Metrics/MethodLength
-      path = @persistence_path
-      dir = File.dirname(path)
-      Dir.mkdir(dir) unless Dir.exist?(dir)
-
-      payload =
-        if (@persistence_format || :marshal).to_sym == :json
-          serializer_for_snapshot.dump(data)
-        else
-          Marshal.dump(data)
-        end
-
-      if @persistence_safe_write
-        tmp = "#{path}.tmp-#{$$}-#{Thread.current.object_id}"
-        File.open(tmp, "wb") { |f| f.write(payload) }
-        File.rename(tmp, path)
-      else
-        File.open(path, "wb") { |f| f.write(payload) }
-      end
-    end
-
-    # Reads snapshot data from disk
-    # Uses safe read if configured
-    def read_snapshot
-      if (@persistence_format || :marshal).to_sym == :json
-        serializer_for_snapshot.load(File.binread(@persistence_path))
-      else
-        ## safe to use Marshal here as we control the file
-        Marshal.load(File.binread(@persistence_path)) # rubocop:disable Security/MarshalLoad
-      end
     end
   end
 end
