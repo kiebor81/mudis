@@ -1,0 +1,19 @@
+class Mudis
+  module Persistence
+    def save_snapshot!: () -> void
+
+    def load_snapshot!: () -> void
+
+    def install_persistence_hook!: () -> void
+
+    private
+
+    def snapshot_dump: () -> Hash[String, untyped]
+
+    def snapshot_restore: (Hash[String, untyped]) -> void
+
+    def safe_write_snapshot: (Hash[String, untyped]) -> void
+
+    def read_snapshot: () -> Hash[String, untyped]
+  end
+end

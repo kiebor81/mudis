@@ -1,0 +1,11 @@
+class Mudis
+  module Metrics
+    def metrics: () -> Hash[Symbol, untyped]
+
+    def reset_metrics!: () -> void
+
+    private
+
+    def metric: (Symbol) -> void
+  end
+end

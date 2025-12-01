@@ -1,7 +1,9 @@
 class MudisClient
-  SOCKET_PATH: String
+  include MudisIPCConfig
 
   def initialize: () -> void
+
+  def open_connection: () -> (TCPSocket | UNIXSocket)
 
   def request: (payload: { cmd: String, key?: String, value?: untyped, ttl?: Integer?, namespace?: String? }) -> untyped
 

@@ -1,4 +1,10 @@
 class Mudis
+  extend LRU
+  extend Persistence
+  extend Metrics
+  extend Namespace
+  extend Expiry
+
   # Configuration
   class << self
     attr_accessor serializer : Object

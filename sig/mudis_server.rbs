@@ -1,7 +1,17 @@
 class MudisServer
-  SOCKET_PATH: String
+  include MudisIPCConfig
 
   def self.start!: () -> void
 
-  def self.handle_client: (sock: UNIXSocket) -> void
+  def self.start_tcp_server!: () -> void
+
+  def self.start_unix_server!: () -> void
+
+  def self.accept_connections: (server: (TCPServer | UNIXServer)) -> void
+
+  def self.handle_client: (socket: (TCPSocket | UNIXSocket)) -> void
+
+  def self.process_request: (req: Hash[String, untyped]) -> Hash[Symbol, untyped]
+
+  def self.write_response: (socket: (TCPSocket | UNIXSocket), payload: Hash[Symbol, untyped]) -> void
 end

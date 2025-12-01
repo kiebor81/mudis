@@ -1,0 +1,13 @@
+class Mudis
+  module Expiry
+    def start_expiry_thread: (?interval: Integer) -> void
+
+    def stop_expiry_thread: () -> void
+
+    def cleanup_expired!: () -> void
+
+    private
+
+    def effective_ttl: (?expires_in: Integer?) -> Integer?
+  end
+end

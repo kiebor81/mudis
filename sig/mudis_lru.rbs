@@ -1,0 +1,21 @@
+class Mudis
+  class LRUNode
+    attr_accessor key: String
+    attr_accessor prev: LRUNode?
+    attr_accessor next: LRUNode?
+
+    def initialize: (String) -> void
+  end
+
+  module LRU
+    private
+
+    def evict_key: (Integer, String) -> void
+
+    def insert_lru: (Integer, LRUNode) -> void
+
+    def promote_lru: (Integer, String) -> void
+
+    def remove_node: (Integer, LRUNode) -> void
+  end
+end

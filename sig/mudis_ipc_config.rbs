@@ -1,0 +1,10 @@
+# Shared configuration for IPC mode (server and client)
+module MudisIPCConfig
+  SOCKET_PATH: String
+
+  TCP_HOST: String
+
+  TCP_PORT: Integer
+
+  def self.use_tcp?: () -> bool
+end

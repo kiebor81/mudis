@@ -1,0 +1,13 @@
+class Mudis
+  module Namespace
+    def keys: (namespace: String) -> Array[String]
+
+    def clear_namespace: (namespace: String) -> void
+
+    def with_namespace: (namespace: String) { () -> untyped } -> untyped
+
+    private
+
+    def namespaced_key: (String, ?namespace: String?) -> String
+  end
+end
