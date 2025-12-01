@@ -1,5 +1,13 @@
 # frozen_string_literal: true
 
+require "simplecov"
+SimpleCov.start do
+  add_filter "/spec/"
+  add_filter "/tmp/"
+  add_filter "lib/mudis_server.rb" if Gem.win_platform?
+  add_filter "lib/mudis_client.rb" if Gem.win_platform?
+end
+
 require "climate_control"
 
 require_relative "../lib/mudis"

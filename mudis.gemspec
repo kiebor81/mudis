@@ -19,4 +19,5 @@ Gem::Specification.new do |spec|
   spec.test_files = Dir["spec/**/*_spec.rb"]
   spec.add_development_dependency "climate_control", "~> 1.1.0"
   spec.add_development_dependency "rspec", "~> 3.12"
+  spec.add_development_dependency "simplecov", "~> 0.22"
 end
