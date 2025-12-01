@@ -27,7 +27,7 @@ Mudis also works naturally in Hanami because it’s a pure Ruby in-memory cache.
   - [Cache Key Lifecycle](#cache-key-lifecycle)
 - [Features](#features)
 - [Installation](#installation)
-- [Configuration (Ruby/Rails)](#configuration-ruby-rails)
+- [Configuration (Ruby/Rails)](#configuration-rubyrails)
 - [Configuration (Hanami)](#configuration-hanami)
 - [Start and Stop Exipry Thread](#start-and-stop-exipry-thread)
   - [Starting Exipry Thread](#starting-exipry-thread)
