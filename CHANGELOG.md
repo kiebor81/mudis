@@ -186,4 +186,29 @@ Gemspec summary and description corrections.
 
 - Fixed missing clause to enable `install_persistence_hook` automatically.
 
+## [0.9.0]
+
+### Changed
+
+- **Major refactoring**: Extracted functionality from monolithic 647-line `Mudis` class into 5 focused modules (53.8% size reduction)
+  - `Mudis::Persistence` - Snapshot save/load operations for warm boot support
+  - `Mudis::Metrics` - Hit/miss/eviction tracking and reporting
+  - `Mudis::LRU` - Least Recently Used eviction strategy with doubly-linked lists
+  - `Mudis::Namespace` - Key scoping and prefixing operations
+  - `Mudis::Expiry` - TTL management and background cleanup thread
+- Main `Mudis` class now extends modules via `extend` pattern for cleaner architecture
+- **Zero breaking changes** - All public APIs maintained with backward compatibility
+
+### Fixed
+
+- **JSON persistence bug**: Switched from `JSON.load` to `JSON.parse` with `symbolize_names: true` option
+  - Previously, `JSON.load` with `symbolize_names` returned `nil`, breaking snapshot restoration
+  - Now properly deserializes JSON snapshots with symbol-keyed hashes
+
+### Added
+
+- Comprehensive isolated module test suite (63 new examples)
+- API compatibility test suite (10 examples) ensuring no breaking changes
+- Improved test coverage to 98.94% (372/376 lines)
+
 ---
