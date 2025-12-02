@@ -934,7 +934,7 @@ Mudis is not intended to be a general-purpose, distributed caching platform. You
 
 - [x] Review Mudis for improved readability and reduce complexity in top-level functions
 - [x] Enhanced guards
-- [ ] Refactor main classes for enhanced readability
+- [x] Refactor main classes for enhanced readability
 - [ ] Review for functionality gaps and enhance as needed 
 
 ---
