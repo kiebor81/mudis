@@ -6,7 +6,7 @@
 
 Mudis is a lightweight, Ruby-native, in-memory cache intended for:
 
-- Per-process or per-thread caching
+- Singleton per-process or per-thread caching
 - Fast LRU eviction with optional compression
 - Clear and observable behavior
 - Configuration via Ruby DSL
