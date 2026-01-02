@@ -799,7 +799,7 @@ _10000 iterations of 512KB, JSON, compression ON_
 ## Known Limitations
 
 - Data is **non-persistent**; only soft-persistence is optionally provided.
-- No SQL or equivallent query interface for cached data. Data is per Key retrieval only.
+- No SQL or equivallent query interface for cached data. Data is per Key retrieval only (see [Mudis-QL](https://github.com/kiebor81/mudis-ql)).
 - Compression introduces CPU overhead.
 
 ---
