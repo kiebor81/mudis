@@ -29,8 +29,8 @@ Mudis also works naturally in Hanami because it’s a pure Ruby in-memory cache.
 - [Installation](#installation)
 - [Configuration (Ruby/Rails)](#configuration-rubyrails)
 - [Configuration (Hanami)](#configuration-hanami)
-- [Start and Stop Exipry Thread](#start-and-stop-exipry-thread)
-  - [Starting Exipry Thread](#starting-exipry-thread)
+- [Start and Stop Expiry Thread](#start-and-stop-expiry-thread)
+  - [Starting Expiry Thread](#starting-expiry-thread)
   - [Graceful Shutdown](#graceful-shutdown)
 - [Basic Usage](#basic-usage)
   - [Developer Utilities](#developer-utilities)
@@ -245,11 +245,11 @@ end
 
 ---
 
-## Start and Stop Exipry Thread
+## Start and Stop Expiry Thread
 
 The expiry thread is not triggered automatically when your application starts. You must add the start and stop in the respective process hooks.
 
-### Starting Exipry Thread
+### Starting Expiry Thread
 
 To enable background expiration and removal, you must start the expiry thread at start up after configuration.
 
