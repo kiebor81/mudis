@@ -8,12 +8,12 @@ class Mudis
 
     private
 
-    def snapshot_dump: () -> Hash[String, untyped]
+    def snapshot_dump: () -> Array[{ key: String, value: untyped, expires_in: Integer? }]
 
-    def snapshot_restore: (Hash[String, untyped]) -> void
+    def snapshot_restore: (Array[{ key: String, value: untyped, expires_in: Integer? }]) -> void
 
-    def safe_write_snapshot: (Hash[String, untyped]) -> void
+    def safe_write_snapshot: (Array[{ key: String, value: untyped, expires_in: Integer? }]) -> void
 
-    def read_snapshot: () -> Hash[String, untyped]
+    def read_snapshot: () -> Array[{ key: String, value: untyped, expires_in: Integer? }]
   end
 end

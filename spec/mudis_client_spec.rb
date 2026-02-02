@@ -18,7 +18,7 @@ RSpec.describe MudisClient do # rubocop:disable Metrics/BlockLength
     if MudisIPCConfig.use_tcp?
       allow(TCPSocket).to receive(:new).and_return(mock_socket)
     else
-      allow(UNIXSocket).to receive(:open).and_yield(mock_socket)
+      allow(UNIXSocket).to receive(:open).and_return(mock_socket)
     end
     allow(mock_socket).to receive(:close)
   end

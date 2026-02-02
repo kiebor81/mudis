@@ -45,8 +45,9 @@ class Mudis
   def self.clear: (String, ?namespace: String) -> void
   def self.replace: (String, untyped, ?expires_in: Integer, ?namespace: String) -> void
   def self.inspect: (String, ?namespace: String) -> Hash[Symbol, untyped]?
-  def self.keys: (?namespace: String) -> Array[String]
-  def self.clear_namespace: (?namespace: String) -> void
+  def self.keys: (namespace: String) -> Array[String]
+  def self.clear_namespace: (namespace: String) -> void
+  def self.with_namespace: (namespace: String) { () -> untyped } -> untyped
 
   # Introspection & management
   def self.metrics: () -> Hash[Symbol, untyped]
@@ -59,4 +60,9 @@ class Mudis
   # State reset
   def self.reset!: () -> void
   def self.reset_metrics!: () -> void
+
+  # Persistence
+  def self.save_snapshot!: () -> void
+  def self.load_snapshot!: () -> void
+  def self.install_persistence_hook!: () -> void
 end

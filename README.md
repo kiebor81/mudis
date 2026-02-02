@@ -96,15 +96,57 @@ There are plenty out there, in various states of maintenance and in many shapes 
 
 #### Internal Structure and Behaviour
 
-![mudis_flow](design/mudis_obj.png "Mudis Internals")
+```mermaid
+flowchart TD
+  A[Mudis] --> C[Config]
+  A --> B[Shards/Buckets]
+  B --> S[Store Hash]
+  B --> L[LRU List]
+  B --> M[Mutex]
+  A --> E[Expiry Thread]
+  A --> P[Persistence]
+  A --> R[Metrics]
+  A --> N[Namespace]
+```
 
 #### Write - Read - Eviction
 
-![mudis_flow](design/mudis_flow.png "Write - Read - Eviction")
+```mermaid
+flowchart TD
+  W[Write] --> S[Serialize]
+  S --> Z{Compress?}
+  Z -- Yes --> ZL[Zlib Deflate]
+  Z -- No --> SZ[Raw]
+  ZL --> G[Size/Memory Guardrails]
+  SZ --> G
+  G --> T[Set TTL]
+  T --> I[Insert in Bucket]
+  I --> L[LRU Insert]
+  L --> M[Update Bytes]
+  R[Read] --> LK[Lookup]
+  LK --> X{Expired?}
+  X -- Yes --> EV[Evict]
+  X -- No --> D[Deserialize/Inflate]
+  D --> PR[Promote LRU]
+  PR --> OUT[Return Value]
+  E[Evict] --> LRU[LRU Tail]
+```
 
 #### Cache Key Lifecycle
 
-![mudis_lru](design/mudis_lru.png "Mudis Cache Key Lifecycle")
+```mermaid
+sequenceDiagram
+  participant Client
+  participant Mudis
+  participant LRU as LRU List
+  Client->>Mudis: write(key, value)
+  Mudis->>LRU: insert(key) at head
+  Client->>Mudis: read(key)
+  Mudis->>LRU: promote(key) to head
+  Note over Mudis: if over threshold, evict tail
+  Mudis->>LRU: evict(tail)
+  Mudis-->>Client: value or nil
+```
 
 ---
 
@@ -611,7 +653,16 @@ Mudis.load_snapshot!
 
 #### Example Flow
 
-![mudis_persistence](design/mudis_persistence.png "Mudis Persistence Strategy")
+```mermaid
+flowchart LR
+  A[App Boot] --> B[Configure Mudis]
+  B --> C[Load Snapshot]
+  C --> D[Cache Warm]
+  D --> E[Normal Operations]
+  E --> F[Exit Hook]
+  F --> G[Save Snapshot]
+  G --> H[Snapshot File]
+```
 
 1. On startup, `Mudis.load_snapshot!` repopulates the cache.  
 2. Your app uses the cache as normal (`write`, `read`, `fetch`, etc.).  
@@ -647,7 +698,18 @@ This design allows multiple workers to share the same cache without duplicating 
 | **Full Feature Support**          | All Mudis features (TTL, compression, metrics, etc.) work transparently.                 |
 | **Safe & Local**                  | Communication is limited to the host system’s UNIX socket, ensuring isolation and speed. |
 
-![mudis_ipc](design/mudis_ipc.png "Mudis IPC")
+```mermaid
+flowchart LR
+  M[Master Process] --> S[MudisServer]
+  W1[Worker 1] --> C1[MudisClient]
+  W2[Worker 2] --> C2[MudisClient]
+  W3[Worker 3] --> C3[MudisClient]
+  C1 --> U[Unix Socket/TCP]
+  C2 --> U
+  C3 --> U
+  U --> S
+  S --> Cache[Mudis Cache]
+```
 
 ### Setup (Puma)
 

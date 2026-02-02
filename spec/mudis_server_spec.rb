@@ -6,6 +6,13 @@ require "json"
 require_relative "spec_helper"
 
 RSpec.describe MudisServer do # rubocop:disable Metrics/BlockLength
+  unless ENV["MUDIS_RUN_IPC"] == "true"
+    it "skips IPC socket tests unless MUDIS_RUN_IPC=true" do
+      skip "Set MUDIS_RUN_IPC=true to run IPC socket tests"
+    end
+    next
+  end
+
   let(:socket_path) { MudisIPCConfig::SOCKET_PATH }
 
   before(:all) do

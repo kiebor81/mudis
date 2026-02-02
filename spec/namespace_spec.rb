@@ -23,6 +23,29 @@ RSpec.describe "Mudis Namespace Operations" do # rubocop:disable Metrics/BlockLe
     expect(Mudis.read("x")).to be_nil
   end
 
+  it "does not double-prefix keys in exists? under thread namespace" do
+    Mudis.with_namespace("ns") do
+      Mudis.write("k", "v")
+      expect(Mudis.exists?("k")).to be true
+    end
+  end
+
+  it "does not double-prefix keys in fetch under thread namespace" do
+    Mudis.with_namespace("ns") do
+      value = Mudis.fetch("k") { "v" }
+      expect(value).to eq("v")
+      expect(Mudis.read("k")).to eq("v")
+    end
+  end
+
+  it "does not double-prefix keys in replace under thread namespace" do
+    Mudis.with_namespace("ns") do
+      Mudis.write("k", "v")
+      Mudis.replace("k", "v2")
+      expect(Mudis.read("k")).to eq("v2")
+    end
+  end
+
   describe ".keys" do
     it "returns only keys for the given namespace" do
       Mudis.write("user:1", "Alice", namespace: "users")

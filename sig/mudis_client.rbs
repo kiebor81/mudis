@@ -5,7 +5,7 @@ class MudisClient
 
   def open_connection: () -> (TCPSocket | UNIXSocket)
 
-  def request: (payload: { cmd: String, key?: String, value?: untyped, ttl?: Integer?, namespace?: String? }) -> untyped
+  def request: (payload: Hash[Symbol, untyped]) -> untyped
 
   def read: (key: String, namespace?: String?) -> untyped
 
@@ -17,7 +17,7 @@ class MudisClient
 
   def fetch: (key: String, expires_in?: Integer?, namespace?: String?, &block: { () -> untyped }) -> untyped
 
-  def metrics: () -> { reads: Integer, writes: Integer, deletes: Integer, exists: Integer }
+  def metrics: () -> Hash[Symbol, untyped]
 
   def reset_metrics!: () -> void
 

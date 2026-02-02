@@ -30,4 +30,13 @@ RSpec.describe "Mudis Memory Guardrails" do
     expect(Mudis.read("b")).to be_nil
     expect(Mudis.metrics[:rejected]).to be > 0
   end
+
+  it "rejects updates that exceed max memory" do
+    Mudis.write("a", "a" * 10)
+    expect(Mudis.read("a")).to eq("a" * 10)
+
+    Mudis.update("a") { "b" * 200 }
+    expect(Mudis.read("a")).to eq("a" * 10)
+    expect(Mudis.metrics[:rejected]).to be > 0
+  end
 end

@@ -155,8 +155,7 @@ class Mudis # rubocop:disable Metrics/ClassLength
 
     # Checks if a key exists and is not expired
     def exists?(key, namespace: nil)
-      key = namespaced_key(key, namespace)
-      !!read(key)
+      !!read(key, namespace: namespace)
     end
 
     # Reads and returns the value for a key, updating LRU and metrics
@@ -174,7 +173,10 @@ class Mudis # rubocop:disable Metrics/ClassLength
           raw_entry = nil
         end
 
-        store[key][:touches] = (store[key][:touches] || 0) + 1 if store[key]
+        if store[key]
+          store[key][:touches] = (store[key][:touches] || 0) + 1
+          promote_lru(idx, key)
+        end
 
         metric(:hits) if raw_entry
         metric(:misses) unless raw_entry
@@ -183,7 +185,6 @@ class Mudis # rubocop:disable Metrics/ClassLength
       return nil unless raw_entry
 
       value = decompress_and_deserialize(raw_entry[:value])
-      promote_lru(idx, key)
       value
     end
 
@@ -244,10 +245,27 @@ class Mudis # rubocop:disable Metrics/ClassLength
       new_value = yield(value)
       new_raw = serializer.dump(new_value)
       new_raw = Zlib::Deflate.deflate(new_raw) if compress
+      return if max_value_bytes && new_raw.bytesize > max_value_bytes
 
       mutex.synchronize do
-        old_size = key.bytesize + raw_entry[:value].bytesize
+        current_entry = store[key]
+        return nil unless current_entry
+
+        old_size = key.bytesize + current_entry[:value].bytesize
         new_size = key.bytesize + new_raw.bytesize
+
+        if hard_memory_limit && (current_memory_bytes - old_size + new_size) > max_memory_bytes
+          metric(:rejected)
+          return
+        end
+
+        while (@current_bytes[idx] - old_size + new_size) > (@threshold_bytes / buckets) && @lru_tails[idx]
+          break if @lru_tails[idx].key == key
+
+          evict_key(idx, @lru_tails[idx].key)
+          metric(:evictions)
+        end
+
         store[key][:value] = new_raw
         @current_bytes[idx] += (new_size - old_size)
         promote_lru(idx, key)
@@ -270,14 +288,13 @@ class Mudis # rubocop:disable Metrics/ClassLength
     # Optionally accepts an expiration time
     # If force is true, it always fetches and writes the value
     def fetch(key, expires_in: nil, force: false, namespace: nil)
-      key = namespaced_key(key, namespace)
       unless force
-        cached = read(key)
+        cached = read(key, namespace: namespace)
         return cached if cached
       end
 
       value = yield
-      write(key, value, expires_in: expires_in)
+      write(key, value, expires_in: expires_in, namespace: namespace)
       value
     end
 
