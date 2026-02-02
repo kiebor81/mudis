@@ -218,4 +218,9 @@ Gemspec summary and description corrections.
 - Concurreny race conditions
 - LRU promotion collisions
 
+## [0.9.4]
+
+- IPC mode overhaul
+- Configurable Expiry Threshold
+
 ---
