@@ -29,6 +29,8 @@ RSpec.describe "Mudis Public API" do
       expect(Mudis).to respond_to(:max_value_bytes=)
       expect(Mudis).to respond_to(:hard_memory_limit)
       expect(Mudis).to respond_to(:hard_memory_limit=)
+      expect(Mudis).to respond_to(:eviction_threshold)
+      expect(Mudis).to respond_to(:eviction_threshold=)
       expect(Mudis).to respond_to(:max_ttl)
       expect(Mudis).to respond_to(:max_ttl=)
       expect(Mudis).to respond_to(:default_ttl)
@@ -77,6 +79,7 @@ RSpec.describe "Mudis Public API" do
       expect(Mudis.method(:fetch).parameters).to include([:key, :expires_in])
       expect(Mudis.method(:fetch).parameters).to include([:key, :force])
       expect(Mudis.method(:fetch).parameters).to include([:key, :namespace])
+      expect(Mudis.method(:fetch).parameters).to include([:key, :singleflight])
     end
 
     it "verifies LRUNode class is still accessible" do

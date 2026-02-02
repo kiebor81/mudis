@@ -6,5 +6,13 @@ module MudisIPCConfig
 
   TCP_PORT: Integer
 
+  DEFAULT_TIMEOUT: Integer
+
+  DEFAULT_RETRIES: Integer
+
   def self.use_tcp?: () -> bool
+
+  def self.timeout: () -> Float
+
+  def self.retries: () -> Integer
 end

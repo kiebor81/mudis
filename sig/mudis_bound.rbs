@@ -1,0 +1,25 @@
+class Mudis
+  class Bound
+    attr_reader namespace: String
+
+    def initialize: (
+      namespace: String,
+      ?default_ttl: Integer?,
+      ?max_ttl: Integer?,
+      ?max_value_bytes: Integer?
+    ) -> void
+
+    def read: (String) -> untyped?
+    def write: (String, untyped, ?expires_in: Integer?) -> void
+    def update: (String) { (untyped) -> untyped } -> void
+    def delete: (String) -> void
+    def exists?: (String) -> bool
+    def fetch: (String, ?expires_in: Integer?, ?force: bool, ?singleflight: bool) { () -> untyped } -> untyped?
+    def clear: (String) -> void
+    def replace: (String, untyped, ?expires_in: Integer?) -> void
+    def inspect: (String) -> Hash[Symbol, untyped]?
+    def keys: () -> Array[String]
+    def metrics: () -> Hash[Symbol, untyped]
+    def clear_namespace: () -> void
+  end
+end

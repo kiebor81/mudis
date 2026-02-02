@@ -13,14 +13,19 @@ class MudisServer
   # Define command handlers mapping
   # Each command maps to a lambda that takes a request hash and performs the corresponding Mudis operation.
   COMMANDS = {
-    "read"          => ->(r) { Mudis.read(r[:key], namespace: r[:namespace]) },
-    "write"         => ->(r) { Mudis.write(r[:key], r[:value], expires_in: r[:ttl], namespace: r[:namespace]) },
-    "delete"        => ->(r) { Mudis.delete(r[:key], namespace: r[:namespace]) },
-    "exists"        => ->(r) { Mudis.exists?(r[:key], namespace: r[:namespace]) },
-    "fetch"         => ->(r) { Mudis.fetch(r[:key], expires_in: r[:ttl], namespace: r[:namespace]) { r[:fallback] } },
-    "metrics"       => ->(_) { Mudis.metrics },
-    "reset_metrics" => ->(_) { Mudis.reset_metrics! },
-    "reset"         => ->(_) { Mudis.reset! }
+    "read" => ->(r) { Mudis.read(r[:key], namespace: r[:namespace]) },
+    "write" => ->(r) { Mudis.write(r[:key], r[:value], expires_in: r[:ttl], namespace: r[:namespace]) },
+    "delete" => ->(r) { Mudis.delete(r[:key], namespace: r[:namespace]) },
+    "exists" => ->(r) { Mudis.exists?(r[:key], namespace: r[:namespace]) },
+    "fetch" => ->(r) { Mudis.fetch(r[:key], expires_in: r[:ttl], namespace: r[:namespace]) { r[:fallback] } },
+    "inspect" => ->(r) { Mudis.inspect(r[:key], namespace: r[:namespace]) },
+    "keys" => ->(r) { Mudis.keys(namespace: r[:namespace]) },
+    "clear_namespace" => ->(r) { Mudis.clear_namespace(namespace: r[:namespace]) },
+    "least_touched" => ->(r) { Mudis.least_touched(r[:limit]) },
+    "all_keys" => ->(_) { Mudis.all_keys },
+    "current_memory_bytes" => ->(_) { Mudis.current_memory_bytes },
+    "max_memory_bytes" => ->(_) { Mudis.max_memory_bytes },
+    "metrics" => ->(_) { Mudis.metrics }
   }.freeze
 
   # Start the MudisServer
@@ -43,7 +48,7 @@ class MudisServer
   end
 
   # Start UNIX socket server (production mode for Linux/macOS)
-  def self.start_unix_server! # rubocop:disable Metrics/MethodLength
+  def self.start_unix_server!
     File.unlink(SOCKET_PATH) if File.exist?(SOCKET_PATH)
     server = UNIXServer.new(SOCKET_PATH)
     server.listen(128)

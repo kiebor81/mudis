@@ -10,6 +10,7 @@ require_relative "mudis/persistence"
 require_relative "mudis/metrics"
 require_relative "mudis/namespace"
 require_relative "mudis/expiry"
+require_relative "mudis/bound"
 
 # Mudis is a thread-safe, in-memory, sharded, LRU cache with optional compression and expiry.
 # It is designed for high concurrency and performance within a Ruby application.
@@ -26,6 +27,8 @@ class Mudis # rubocop:disable Metrics/ClassLength
   @compress = false                             # Whether to compress values with Zlib
   @metrics = { hits: 0, misses: 0, evictions: 0, rejected: 0 } # Metrics tracking read/write behaviour
   @metrics_mutex = Mutex.new                    # Mutex for synchronizing access to metrics
+  @metrics_by_namespace = {}                    # Per-namespace metrics
+  @metrics_by_namespace_mutex = Mutex.new       # Mutex for synchronizing namespace metrics
   @max_value_bytes = nil                        # Optional size cap per value
   @stop_expiry = false                          # Signal for stopping expiry thread
   @max_ttl = nil                                # Optional maximum TTL for cache entries
@@ -34,18 +37,34 @@ class Mudis # rubocop:disable Metrics/ClassLength
   # --- Configuration Management ---
 
   class << self
-    attr_accessor :serializer, :compress, :hard_memory_limit, :max_ttl, :default_ttl
+    attr_accessor :serializer, :compress, :hard_memory_limit, :max_ttl, :default_ttl, :eviction_threshold
     attr_reader :max_bytes, :max_value_bytes
 
     # Configures Mudis with a block, allowing customization of settings
     def configure
-      yield(config)
+      new_config = config.dup
+      yield(new_config)
+
+      old_config = @config
+      @config = new_config
       apply_config!
+    rescue StandardError
+      @config = old_config
+      raise
     end
 
     # Returns the current configuration object
     def config
       @config ||= MudisConfig.new
+    end
+
+    def bind(namespace:, default_ttl: nil, max_ttl: nil, max_value_bytes: nil)
+      Bound.new(
+        namespace: namespace,
+        default_ttl: default_ttl,
+        max_ttl: max_ttl,
+        max_value_bytes: max_value_bytes
+      )
     end
 
     # Applies the current configuration to Mudis
@@ -57,6 +76,7 @@ class Mudis # rubocop:disable Metrics/ClassLength
       self.max_value_bytes = config.max_value_bytes
       self.hard_memory_limit = config.hard_memory_limit
       self.max_bytes = config.max_bytes
+      self.eviction_threshold = config.eviction_threshold
       self.max_ttl = config.max_ttl
       self.default_ttl = config.default_ttl
 
@@ -85,6 +105,9 @@ class Mudis # rubocop:disable Metrics/ClassLength
       raise ArgumentError, "max_value_bytes must be > 0" if config.max_value_bytes && config.max_value_bytes <= 0
 
       raise ArgumentError, "buckets must be > 0" if config.buckets && config.buckets <= 0
+      if config.eviction_threshold && (config.eviction_threshold <= 0 || config.eviction_threshold > 1)
+        raise ArgumentError, "eviction_threshold must be > 0 and <= 1"
+      end
       raise ArgumentError, "max_ttl must be > 0" if config.max_ttl && config.max_ttl <= 0
       raise ArgumentError, "default_ttl must be > 0" if config.default_ttl && config.default_ttl <= 0
     end
@@ -102,6 +125,7 @@ class Mudis # rubocop:disable Metrics/ClassLength
       @lru_tails     = Array.new(b) { nil }
       @lru_nodes     = Array.new(b) { {} }
       @current_bytes = Array.new(b, 0)
+      @inflight_mutexes = {}
 
       reset_metrics!
     end
@@ -111,7 +135,16 @@ class Mudis # rubocop:disable Metrics/ClassLength
       raise ArgumentError, "max_bytes must be > 0" if value.to_i <= 0
 
       @max_bytes = value
-      @threshold_bytes = (@max_bytes * 0.9).to_i
+      threshold = @eviction_threshold || 0.9
+      @threshold_bytes = (@max_bytes * threshold).to_i
+    end
+
+    def eviction_threshold=(value)
+      return @eviction_threshold = nil if value.nil?
+      raise ArgumentError, "eviction_threshold must be > 0 and <= 1" if value <= 0 || value > 1
+
+      @eviction_threshold = value
+      @threshold_bytes = (@max_bytes * @eviction_threshold).to_i
     end
 
     # Sets the maximum size for a single value in bytes, raising an error if invalid
@@ -141,9 +174,12 @@ class Mudis # rubocop:disable Metrics/ClassLength
   @lru_nodes = Array.new(buckets) { {} }        # Map of key => LRU node
   @current_bytes = Array.new(buckets, 0)        # Memory usage per bucket
   @max_bytes = 1_073_741_824                    # 1 GB global max cache size
-  @threshold_bytes = (@max_bytes * 0.9).to_i # Eviction threshold at 90%
+  @eviction_threshold = 0.9
+  @threshold_bytes = (@max_bytes * @eviction_threshold).to_i # Eviction threshold at 90%
   @expiry_thread = nil # Background thread for expiry cleanup
   @hard_memory_limit = false # Whether to enforce hard memory cap
+  @inflight_mutexes_lock = Mutex.new
+  @inflight_mutexes = {}
 
   # --- Core Cache Operations ---
 
@@ -161,6 +197,7 @@ class Mudis # rubocop:disable Metrics/ClassLength
     # Reads and returns the value for a key, updating LRU and metrics
     def read(key, namespace: nil) # rubocop:disable Metrics/MethodLength,Metrics/AbcSize,Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
       key = namespaced_key(key, namespace)
+      ns = namespace || Thread.current[:mudis_namespace]
       raw_entry = nil
       idx = bucket_index(key)
       mutex = @mutexes[idx]
@@ -178,26 +215,26 @@ class Mudis # rubocop:disable Metrics/ClassLength
           promote_lru(idx, key)
         end
 
-        metric(:hits) if raw_entry
-        metric(:misses) unless raw_entry
+        metric(:hits, namespace: ns) if raw_entry
+        metric(:misses, namespace: ns) unless raw_entry
       end
 
       return nil unless raw_entry
 
-      value = decompress_and_deserialize(raw_entry[:value])
-      value
+      decompress_and_deserialize(raw_entry[:value])
     end
 
     # Writes a value to the cache with optional expiry and LRU tracking
     def write(key, value, expires_in: nil, namespace: nil) # rubocop:disable Metrics/MethodLength,Metrics/CyclomaticComplexity,Metrics/AbcSize,Metrics/PerceivedComplexity
       key = namespaced_key(key, namespace)
+      ns = namespace || Thread.current[:mudis_namespace]
       raw = serializer.dump(value)
       raw = Zlib::Deflate.deflate(raw) if compress
       size = key.bytesize + raw.bytesize
       return if max_value_bytes && raw.bytesize > max_value_bytes
 
       if hard_memory_limit && current_memory_bytes + size > max_memory_bytes
-        metric(:rejected)
+        metric(:rejected, namespace: ns)
         return
       end
 
@@ -212,15 +249,18 @@ class Mudis # rubocop:disable Metrics/ClassLength
         evict_key(idx, key) if store[key]
 
         while @current_bytes[idx] + size > (@threshold_bytes / buckets) && @lru_tails[idx]
-          evict_key(idx, @lru_tails[idx].key)
-          metric(:evictions)
+          evict_key_name = @lru_tails[idx].key
+          evict_ns = store[evict_key_name] && store[evict_key_name][:namespace]
+          evict_key(idx, evict_key_name)
+          metric(:evictions, namespace: evict_ns)
         end
 
         store[key] = {
           value: raw,
           expires_at: expires_in ? Time.now + expires_in : nil,
           created_at: Time.now,
-          touches: 0
+          touches: 0,
+          namespace: ns
         }
 
         insert_lru(idx, key)
@@ -254,19 +294,29 @@ class Mudis # rubocop:disable Metrics/ClassLength
         old_size = key.bytesize + current_entry[:value].bytesize
         new_size = key.bytesize + new_raw.bytesize
 
+        ns = current_entry[:namespace]
+
         if hard_memory_limit && (current_memory_bytes - old_size + new_size) > max_memory_bytes
-          metric(:rejected)
+          metric(:rejected, namespace: ns)
           return
         end
 
         while (@current_bytes[idx] - old_size + new_size) > (@threshold_bytes / buckets) && @lru_tails[idx]
           break if @lru_tails[idx].key == key
 
-          evict_key(idx, @lru_tails[idx].key)
-          metric(:evictions)
+          evict_key_name = @lru_tails[idx].key
+          evict_ns = store[evict_key_name] && store[evict_key_name][:namespace]
+          evict_key(idx, evict_key_name)
+          metric(:evictions, namespace: evict_ns)
         end
 
         store[key][:value] = new_raw
+
+        # Refresh TTL on update. If no TTL applies, keep existing expiry (possibly nil).
+        now = Time.now
+        ttl = current_entry[:expires_at] ? (current_entry[:expires_at] - current_entry[:created_at]) : nil
+        store[key][:created_at] = now
+        store[key][:expires_at] = ttl ? now + ttl : nil
         @current_bytes[idx] += (new_size - old_size)
         promote_lru(idx, key)
       end
@@ -287,15 +337,13 @@ class Mudis # rubocop:disable Metrics/ClassLength
     # The block is executed to generate the value if it doesn't exist
     # Optionally accepts an expiration time
     # If force is true, it always fetches and writes the value
-    def fetch(key, expires_in: nil, force: false, namespace: nil)
-      unless force
-        cached = read(key, namespace: namespace)
-        return cached if cached
-      end
+    def fetch(key, expires_in: nil, force: false, namespace: nil, singleflight: false) # rubocop:disable Metrics/MethodLength
+      return fetch_without_lock(key, expires_in:, force:, namespace:) { yield } unless singleflight
 
-      value = yield
-      write(key, value, expires_in: expires_in, namespace: namespace)
-      value
+      lock_key = namespaced_key(key, namespace)
+      with_inflight_lock(lock_key) do
+        fetch_without_lock(key, expires_in:, force:, namespace:) { yield }
+      end
     end
 
     # Clears a specific key from the cache, a semantic synonym for delete
@@ -382,6 +430,34 @@ class Mudis # rubocop:disable Metrics/ClassLength
     def decompress_and_deserialize(raw)
       val = compress ? Zlib::Inflate.inflate(raw) : raw
       serializer.load(val)
+    end
+
+    def fetch_without_lock(key, expires_in:, force:, namespace:)
+      unless force
+        cached = read(key, namespace: namespace)
+        return cached if cached
+      end
+
+      value = yield
+      write(key, value, expires_in: expires_in, namespace: namespace)
+      value
+    end
+
+    def with_inflight_lock(lock_key)
+      entry = nil
+      @inflight_mutexes_lock.synchronize do
+        entry = (@inflight_mutexes[lock_key] ||= { mutex: Mutex.new, count: 0 })
+        entry[:count] += 1
+      end
+
+      entry[:mutex].synchronize { yield }
+    ensure
+      @inflight_mutexes_lock.synchronize do
+        next unless entry
+
+        entry[:count] -= 1
+        @inflight_mutexes.delete(lock_key) if entry[:count] <= 0
+      end
     end
   end
 end

@@ -2,6 +2,7 @@
 
 require "socket"
 require "json"
+require "timeout"
 require_relative "mudis_ipc_config"
 
 # Thread-safe client for communicating with the MudisServer
@@ -25,28 +26,41 @@ class MudisClient
   # Send a request to the MudisServer and return the response
   # @param payload [Hash] The request payload
   # @return [Object] The response value from the server
-  def request(payload) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
+  def request(payload) # rubocop:disable Metrics/MethodLength
     @mutex.synchronize do
-      sock = open_connection
-      sock.puts(JSON.dump(payload))
-      response = sock.gets
-      sock.close
+      attempts = 0
 
-      return nil unless response
+      begin
+        attempts += 1
+        response = nil
 
-      res = JSON.parse(response, symbolize_names: true)
-      raise res[:error] unless res[:ok]
+        Timeout.timeout(MudisIPCConfig.timeout) do
+          sock = open_connection
+          sock.puts(JSON.dump(payload))
+          response = sock.gets
+          sock.close
+        end
 
-      res[:value]
-    rescue Errno::ENOENT, Errno::ECONNREFUSED
-      warn "[MudisClient] Cannot connect to MudisServer. Is it running?"
-      nil
-    rescue JSON::ParserError
-      warn "[MudisClient] Invalid JSON response from server"
-      nil
-    rescue IOError, SystemCallError => e
-      warn "[MudisClient] Connection error: #{e.message}"
-      nil
+        return nil unless response
+
+        res = JSON.parse(response, symbolize_names: true)
+        raise res[:error] unless res[:ok]
+
+        res[:value]
+      rescue Errno::ENOENT, Errno::ECONNREFUSED, Timeout::Error
+        if attempts <= MudisIPCConfig.retries
+          retry
+        end
+
+        warn "[MudisClient] Cannot connect to MudisServer. Is it running?"
+        nil
+      rescue JSON::ParserError
+        warn "[MudisClient] Invalid JSON response from server"
+        nil
+      rescue IOError, SystemCallError => e
+        warn "[MudisClient] Connection error: #{e.message}"
+        nil
+      end
     end
   end
 
@@ -82,19 +96,44 @@ class MudisClient
     new_val
   end
 
+  # Inspect metadata for a key
+  def inspect(key, namespace: nil)
+    command("inspect", key:, namespace:)
+  end
+
+  # Return keys for a namespace
+  def keys(namespace:)
+    command("keys", namespace:)
+  end
+
+  # Clear keys in a namespace
+  def clear_namespace(namespace:)
+    command("clear_namespace", namespace:)
+  end
+
+  # Return least touched keys
+  def least_touched(limit = 10)
+    command("least_touched", limit:)
+  end
+
+  # Return all keys
+  def all_keys
+    command("all_keys")
+  end
+
+  # Return current memory usage
+  def current_memory_bytes
+    command("current_memory_bytes")
+  end
+
+  # Return max memory configured
+  def max_memory_bytes
+    command("max_memory_bytes")
+  end
+
   # Retrieve metrics from the Mudis server
   def metrics
     command("metrics")
-  end
-
-  # Reset metrics on the Mudis server
-  def reset_metrics!
-    command("reset_metrics")
-  end
-
-  # Reset the Mudis server cache state
-  def reset!
-    command("reset")
   end
 
   private
@@ -103,5 +142,4 @@ class MudisClient
   def command(cmd, **opts)
     request({ cmd:, **opts })
   end
-
 end

@@ -8,6 +8,7 @@ class MudisConfig
                 :max_value_bytes,
                 :hard_memory_limit,
                 :max_bytes,
+                :eviction_threshold,
                 :buckets,
                 :max_ttl,
                 :default_ttl,
@@ -23,6 +24,7 @@ class MudisConfig
     @max_value_bytes = nil                    # Max size per value (optional)
     @hard_memory_limit = false                # Enforce max_bytes as hard cap
     @max_bytes = 1_073_741_824                # 1 GB default max cache size
+    @eviction_threshold = 0.9                # Evict when bucket exceeds threshold
     @buckets = nil                            # use nil to signal fallback to ENV or default
     @max_ttl = nil                            # Max TTL for cache entries (optional)
     @default_ttl = nil                        # Default TTL for cache entries (optional)

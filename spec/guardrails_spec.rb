@@ -134,5 +134,19 @@ RSpec.describe "Mudis Configuration Guardrails" do # rubocop:disable Metrics/Blo
         end
       end.to raise_error(ArgumentError, /max_value_bytes cannot exceed max_bytes/)
     end
+
+    it "raises if eviction_threshold is <= 0 or > 1" do
+      expect do
+        Mudis.configure do |c|
+          c.eviction_threshold = 0
+        end
+      end.to raise_error(ArgumentError, /eviction_threshold must be > 0 and <= 1/)
+
+      expect do
+        Mudis.configure do |c|
+          c.eviction_threshold = 1.5
+        end
+      end.to raise_error(ArgumentError, /eviction_threshold must be > 0 and <= 1/)
+    end
   end
 end

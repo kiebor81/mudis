@@ -17,9 +17,19 @@ class MudisClient
 
   def fetch: (key: String, expires_in?: Integer?, namespace?: String?, &block: { () -> untyped }) -> untyped
 
+  def inspect: (key: String, namespace?: String?) -> Hash[Symbol, untyped]?
+
+  def keys: (namespace: String) -> Array[String]
+
+  def clear_namespace: (namespace: String) -> void
+
+  def least_touched: (?Integer) -> Array[[String, Integer]]
+
+  def all_keys: () -> Array[String]
+
+  def current_memory_bytes: () -> Integer
+
+  def max_memory_bytes: () -> Integer
+
   def metrics: () -> Hash[Symbol, untyped]
-
-  def reset_metrics!: () -> void
-
-  def reset!: () -> void
 end

@@ -157,9 +157,10 @@ sequenceDiagram
 - **LRU Eviction**: Automatically evicts least recently used items as memory fills up.
 - **Expiry Support**: Optional TTL per key with background cleanup thread.
 - **Compression**: Optional Zlib compression for large values.
-- **Metrics**: Tracks hits, misses, and evictions.
+- **Metrics**: Tracks hits, misses, and evictions, with optional per-namespace counters.
 - **IPC Mode**: Shared cross-process caching for multi-process aplications.
 - **Soft-persistence**: Data snapshot and reload.
+- **Caller Binding**: Optional scoped cache wrappers via `Mudis.bind`.
 
 ---
 
@@ -189,6 +190,7 @@ Mudis.configure do |c|
   c.max_value_bytes = 2_000_000  # Reject values > 2MB
   c.hard_memory_limit = true # enforce hard memory limits
   c.max_bytes = 1_073_741_824 # set maximum cache size
+  c.eviction_threshold = 0.9 # evict when a bucket exceeds 90% of max_bytes
 end
 
 Mudis.start_expiry_thread(interval: 60) # Cleanup every 60s
@@ -206,6 +208,7 @@ Mudis.compress = true          # Compress values using Zlib
 Mudis.max_value_bytes = 2_000_000  # Reject values > 2MB
 Mudis.hard_memory_limit = true # enforce hard memory limits
 Mudis.max_bytes = 1_073_741_824 # set maximum cache size
+Mudis.eviction_threshold = 0.9 # evict when a bucket exceeds 90% of max_bytes
 
 Mudis.start_expiry_thread(interval: 60) # Cleanup every 60s
 
@@ -331,10 +334,30 @@ Mudis.exists?('user:123') # => true
 
 # Atomically update
 Mudis.update('user:123') { |data| data.merge(age: 30) }
+# Note: update refreshes TTL based on the original TTL duration.
 
 # Delete a key
 Mudis.delete('user:123')
 ```
+
+### Caller-Scoped Cache (Bound)
+
+For caller-bound caching (per-tenant or per-service scoping), use `Mudis.bind` to create a scoped wrapper:
+
+```ruby
+cache = Mudis.bind(
+  namespace: "caller:123",
+  default_ttl: 60,
+  max_ttl: 300,
+  max_value_bytes: 128_000
+)
+
+cache.write("profile", { name: "Alice" })
+cache.read("profile") # => { "name" => "Alice" }
+cache.fetch("expensive", singleflight: true) { expensive_query }
+```
+
+The wrapper delegates to Mudis but automatically applies the namespace and optional per-caller guardrails.
 
 ### Developer Utilities
 
@@ -461,7 +484,7 @@ class MudisService
   # @param force [Boolean] force recomputation
   # @yield return value if key is missing
   def fetch(expires_in: nil, force: false)
-    Mudis.fetch(cache_key, expires_in: expires_in, force: force, namespace: namespace) do
+    Mudis.fetch(cache_key, expires_in: expires_in, force: force, namespace: namespace, singleflight: true) do
       yield
     end
   end
@@ -517,6 +540,13 @@ Mudis.metrics
 #   ]
 # }
 
+```
+
+You can also query metrics for a specific namespace:
+
+```ruby
+Mudis.metrics(namespace: "users")
+# => { hits: 10, misses: 2, evictions: 1, rejected: 0, namespace: "users" }
 ```
 
 Optionally, expose Mudis metrics from a controller or action for remote analysis and monitoring.
@@ -588,6 +618,7 @@ end
 | `Mudis.start_expiry_thread`    | Background TTL cleanup loop (every N sec)   | Disabled by default|
 | `Mudis.hard_memory_limit`    | Enforce hard memory limits on key size and reject if exceeded  | `false`|
 | `Mudis.max_bytes`    | Maximum allowed cache size  | `1GB`|
+| `Mudis.eviction_threshold` | Evict when a bucket exceeds this ratio of max_bytes | `0.9` |
 | `Mudis.max_ttl`    | Set the maximum permitted TTL  | `nil` (no limit) |
 | `Mudis.default_ttl`    | Set the default TTL for fallback when none is provided  | `nil` |
 
@@ -695,7 +726,7 @@ This design allows multiple workers to share the same cache without duplicating 
 | **Shared Cache Across Processes** | All Puma workers share one Mudis instance via IPC.                                       |
 | **Zero External Dependencies**    | No Redis, Memcached, or separate daemon required.                                        |
 | **Memory Efficient**              | Cache data stored only once, not duplicated per worker.                                  |
-| **Full Feature Support**          | All Mudis features (TTL, compression, metrics, etc.) work transparently.                 |
+| **Feature Coverage**              | Core cache ops + introspection (keys, inspect, least_touched) and metrics are supported. |
 | **Safe & Local**                  | Communication is limited to the host system’s UNIX socket, ensuring isolation and speed. |
 
 ```mermaid
@@ -763,12 +794,17 @@ if defined?($mudis) && $mudis
     def self.delete(*a, **k) = $mudis.delete(*a, **k)
     def self.fetch(*a, **k, &b) = $mudis.fetch(*a, **k, &b)
     def self.metrics = $mudis.metrics
-    def self.reset_metrics! = $mudis.reset_metrics!
-    def self.reset! = $mudis.reset!
   end
 
 end
 ```
+
+**IPC safety limitations:**
+
+- Administrative operations are **not** exposed over IPC (e.g., `reset!`, `reset_metrics!`, `save_snapshot!`, `load_snapshot!`).
+- IPC client requests use timeouts and retries:
+  - `MUDIS_IPC_TIMEOUT` (seconds, default: `1`)
+  - `MUDIS_IPC_RETRIES` (default: `1`)
 
 **Use IPC mode when:**
 

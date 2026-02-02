@@ -1,6 +1,6 @@
 class Mudis
   module Metrics
-    def metrics: () -> Hash[Symbol, untyped]
+    def metrics: (?namespace: String) -> Hash[Symbol, untyped]
 
     def reset_metrics!: () -> void
 

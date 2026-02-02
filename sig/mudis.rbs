@@ -14,6 +14,7 @@ class Mudis
     attr_reader max_value_bytes : Integer?
     attr_accessor max_ttl: Integer?
     attr_accessor default_ttl: Integer?
+    attr_accessor eviction_threshold: Float?
     
     def configure: () { (config: MudisConfig) -> void } -> void
     def config: () -> MudisConfig
@@ -21,6 +22,13 @@ class Mudis
     def validate_config!: () -> void
 
     def buckets: () -> Integer
+
+    def bind: (
+      namespace: String,
+      ?default_ttl: Integer?,
+      ?max_ttl: Integer?,
+      ?max_value_bytes: Integer?
+    ) -> Mudis::Bound
   end
 
   # Lifecycle
@@ -39,7 +47,8 @@ class Mudis
     String,
     ?expires_in: Integer,
     ?force: bool,
-    ?namespace: String
+    ?namespace: String,
+    ?singleflight: bool
   ) { () -> untyped } -> untyped
 
   def self.clear: (String, ?namespace: String) -> void
@@ -50,7 +59,7 @@ class Mudis
   def self.with_namespace: (namespace: String) { () -> untyped } -> untyped
 
   # Introspection & management
-  def self.metrics: () -> Hash[Symbol, untyped]
+  def self.metrics: (?namespace: String) -> Hash[Symbol, untyped]
   def self.cleanup_expired!: () -> void
   def self.all_keys: () -> Array[String]
   def self.current_memory_bytes: () -> Integer

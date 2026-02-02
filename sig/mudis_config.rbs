@@ -4,6 +4,7 @@ class MudisConfig
   attr_accessor max_value_bytes: Integer?
   attr_accessor hard_memory_limit: bool
   attr_accessor max_bytes: Integer
+  attr_accessor eviction_threshold: Float?
   attr_accessor max_ttl: Integer?
   attr_accessor default_ttl: Integer?
   attr_accessor buckets: Integer?

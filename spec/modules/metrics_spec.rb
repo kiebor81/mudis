@@ -9,13 +9,16 @@ RSpec.describe Mudis::Metrics do
       
       @metrics = { hits: 5, misses: 3, evictions: 2, rejected: 1 }
       @metrics_mutex = Mutex.new
+      @metrics_by_namespace = {}
+      @metrics_by_namespace_mutex = Mutex.new
       @buckets = 2
       @stores = [{ "key1" => {} }, { "key2" => {} }]
       @current_bytes = [100, 200]
       @lru_nodes = [{ "key1" => nil }, { "key2" => nil }]
       
       class << self
-        attr_accessor :metrics, :metrics_mutex, :buckets, :stores, :current_bytes, :lru_nodes
+        attr_accessor :metrics, :metrics_mutex, :metrics_by_namespace, :metrics_by_namespace_mutex,
+                      :buckets, :stores, :current_bytes, :lru_nodes
         
         def current_memory_bytes
           @current_bytes.sum
