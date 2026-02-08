@@ -1011,7 +1011,6 @@ The primary use cases are:
 
 Mudis is not intended to be a general-purpose, distributed caching platform. You are, however, welcome to build on top of Mudis if you want its functionality in such projects. E.g.,
 
-- mudis-web-cache-server – expose Mudis via HTTP, web sockets, hooks, etc
 - mudis-broker – distributed key routing layer for coordinating multiple Mudis nodes
 - mudis-activejob-store – adapter for using Mudis in job queues or retry buffers
 
