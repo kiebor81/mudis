@@ -211,4 +211,16 @@ Gemspec summary and description corrections.
 - API compatibility test suite (10 examples) ensuring no breaking changes
 - Improved test coverage to 98.94% (372/376 lines)
 
+## [0.9.1]
+
+### Fixed
+
+- Concurreny race conditions
+- LRU promotion collisions
+
+## [0.9.4]
+
+- IPC mode overhaul
+- Configurable Expiry Threshold
+
 ---

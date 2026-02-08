@@ -18,7 +18,7 @@ RSpec.describe MudisClient do # rubocop:disable Metrics/BlockLength
     if MudisIPCConfig.use_tcp?
       allow(TCPSocket).to receive(:new).and_return(mock_socket)
     else
-      allow(UNIXSocket).to receive(:open).and_yield(mock_socket)
+      allow(UNIXSocket).to receive(:open).and_return(mock_socket)
     end
     allow(mock_socket).to receive(:close)
   end
@@ -99,32 +99,93 @@ RSpec.describe MudisClient do # rubocop:disable Metrics/BlockLength
     end
   end
 
-  describe "#reset_metrics!" do
-    it "sends a reset_metrics command" do
-      payload = { cmd: "reset_metrics" }
-      response = { ok: true, value: nil }.to_json
+  describe "#inspect" do
+    it "sends an inspect command and returns metadata" do
+      payload = { cmd: "inspect", key: "test_key", namespace: nil }
+      response = { ok: true, value: { key: "test_key", size_bytes: 10 } }.to_json
 
       expect(mock_socket).to receive(:puts).with(payload.to_json)
       expect(mock_socket).to receive(:gets).and_return(response)
 
-      expect(client.reset_metrics!).to be_nil
+      expect(client.inspect("test_key")).to eq({ key: "test_key", size_bytes: 10 })
     end
   end
 
-  describe "#reset!" do
-    it "sends a reset command" do
-      payload = { cmd: "reset" }
+  describe "#keys" do
+    it "sends a keys command and returns keys" do
+      payload = { cmd: "keys", namespace: "ns" }
+      response = { ok: true, value: ["a", "b"] }.to_json
+
+      expect(mock_socket).to receive(:puts).with(payload.to_json)
+      expect(mock_socket).to receive(:gets).and_return(response)
+
+      expect(client.keys(namespace: "ns")).to eq(["a", "b"])
+    end
+  end
+
+  describe "#clear_namespace" do
+    it "sends a clear_namespace command" do
+      payload = { cmd: "clear_namespace", namespace: "ns" }
       response = { ok: true, value: nil }.to_json
 
       expect(mock_socket).to receive(:puts).with(payload.to_json)
       expect(mock_socket).to receive(:gets).and_return(response)
 
-      expect(client.reset!).to be_nil
+      expect(client.clear_namespace(namespace: "ns")).to be_nil
+    end
+  end
+
+  describe "#least_touched" do
+    it "sends a least_touched command" do
+      payload = { cmd: "least_touched", limit: 5 }
+      response = { ok: true, value: [["a", 0], ["b", 1]] }.to_json
+
+      expect(mock_socket).to receive(:puts).with(payload.to_json)
+      expect(mock_socket).to receive(:gets).and_return(response)
+
+      expect(client.least_touched(5)).to eq([["a", 0], ["b", 1]])
+    end
+  end
+
+  describe "#all_keys" do
+    it "sends an all_keys command" do
+      payload = { cmd: "all_keys" }
+      response = { ok: true, value: ["k1"] }.to_json
+
+      expect(mock_socket).to receive(:puts).with(payload.to_json)
+      expect(mock_socket).to receive(:gets).and_return(response)
+
+      expect(client.all_keys).to eq(["k1"])
+    end
+  end
+
+  describe "#current_memory_bytes" do
+    it "sends a current_memory_bytes command" do
+      payload = { cmd: "current_memory_bytes" }
+      response = { ok: true, value: 123 }.to_json
+
+      expect(mock_socket).to receive(:puts).with(payload.to_json)
+      expect(mock_socket).to receive(:gets).and_return(response)
+
+      expect(client.current_memory_bytes).to eq(123)
+    end
+  end
+
+  describe "#max_memory_bytes" do
+    it "sends a max_memory_bytes command" do
+      payload = { cmd: "max_memory_bytes" }
+      response = { ok: true, value: 456 }.to_json
+
+      expect(mock_socket).to receive(:puts).with(payload.to_json)
+      expect(mock_socket).to receive(:gets).and_return(response)
+
+      expect(client.max_memory_bytes).to eq(456)
     end
   end
 
   describe "error handling" do
     it "warns when the socket is missing" do
+      allow(MudisIPCConfig).to receive(:retries).and_return(1)
       if MudisIPCConfig.use_tcp?
         allow(TCPSocket).to receive(:new).and_raise(Errno::ECONNREFUSED)
       else
@@ -142,6 +203,19 @@ RSpec.describe MudisClient do # rubocop:disable Metrics/BlockLength
       expect(mock_socket).to receive(:gets).and_return(response)
 
       expect { client.read("test_key") }.to raise_error("Something went wrong")
+    end
+
+    it "retries on timeout and then warns" do
+      allow(MudisIPCConfig).to receive(:retries).and_return(1)
+      allow(MudisIPCConfig).to receive(:timeout).and_return(0.01)
+
+      if MudisIPCConfig.use_tcp?
+        allow(TCPSocket).to receive(:new).and_raise(Timeout::Error)
+      else
+        allow(UNIXSocket).to receive(:open).and_raise(Timeout::Error)
+      end
+
+      expect { client.read("test_key") }.to output(/Cannot connect/).to_stderr
     end
   end
 end

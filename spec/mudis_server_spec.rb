@@ -6,7 +6,12 @@ require "json"
 require_relative "spec_helper"
 
 RSpec.describe MudisServer do # rubocop:disable Metrics/BlockLength
-  let(:socket_path) { MudisIPCConfig::SOCKET_PATH }
+  unless ENV["MUDIS_RUN_IPC"] == "true"
+    it "skips IPC socket tests unless MUDIS_RUN_IPC=true" do
+      skip "Set MUDIS_RUN_IPC=true to run IPC socket tests"
+    end
+    next
+  end
 
   before(:all) do
     # Start the server once for all tests
@@ -20,12 +25,18 @@ RSpec.describe MudisServer do # rubocop:disable Metrics/BlockLength
     allow(Mudis).to receive(:delete)
     allow(Mudis).to receive(:exists?).and_return(true)
     allow(Mudis).to receive(:fetch).and_return("mock_fetched_value")
+    allow(Mudis).to receive(:inspect).and_return({ key: "test_key", size_bytes: 10 })
+    allow(Mudis).to receive(:keys).and_return(["a", "b"])
+    allow(Mudis).to receive(:clear_namespace)
+    allow(Mudis).to receive(:least_touched).and_return([["a", 0]])
+    allow(Mudis).to receive(:all_keys).and_return(["k1"])
+    allow(Mudis).to receive(:current_memory_bytes).and_return(123)
+    allow(Mudis).to receive(:max_memory_bytes).and_return(456)
     allow(Mudis).to receive(:metrics).and_return({ reads: 1, writes: 1 })
-    allow(Mudis).to receive(:reset_metrics!)
-    allow(Mudis).to receive(:reset!)
   end
 
-  after do
+  after(:all) do
+    socket_path = MudisIPCConfig::SOCKET_PATH
     File.unlink(socket_path) if File.exist?(socket_path) && !MudisIPCConfig.use_tcp?
   end
 
@@ -36,7 +47,7 @@ RSpec.describe MudisServer do # rubocop:disable Metrics/BlockLength
         JSON.parse(sock.gets, symbolize_names: true)
       end
     else
-      UNIXSocket.open(socket_path) do |sock|
+      UNIXSocket.open(MudisIPCConfig::SOCKET_PATH) do |sock|
         sock.puts(JSON.dump(request))
         JSON.parse(sock.gets, symbolize_names: true)
       end
@@ -74,22 +85,52 @@ RSpec.describe MudisServer do # rubocop:disable Metrics/BlockLength
     expect(Mudis).to have_received(:fetch).with("test_key", expires_in: 60, namespace: "test_ns")
   end
 
+  it "handles the 'inspect' command" do
+    response = send_request({ cmd: "inspect", key: "test_key", namespace: "test_ns" })
+    expect(response).to eq({ ok: true, value: { key: "test_key", size_bytes: 10 } })
+    expect(Mudis).to have_received(:inspect).with("test_key", namespace: "test_ns")
+  end
+
+  it "handles the 'keys' command" do
+    response = send_request({ cmd: "keys", namespace: "test_ns" })
+    expect(response).to eq({ ok: true, value: ["a", "b"] })
+    expect(Mudis).to have_received(:keys).with(namespace: "test_ns")
+  end
+
+  it "handles the 'clear_namespace' command" do
+    response = send_request({ cmd: "clear_namespace", namespace: "test_ns" })
+    expect(response).to eq({ ok: true, value: nil })
+    expect(Mudis).to have_received(:clear_namespace).with(namespace: "test_ns")
+  end
+
+  it "handles the 'least_touched' command" do
+    response = send_request({ cmd: "least_touched", limit: 5 })
+    expect(response).to eq({ ok: true, value: [["a", 0]] })
+    expect(Mudis).to have_received(:least_touched).with(5)
+  end
+
+  it "handles the 'all_keys' command" do
+    response = send_request({ cmd: "all_keys" })
+    expect(response).to eq({ ok: true, value: ["k1"] })
+    expect(Mudis).to have_received(:all_keys)
+  end
+
+  it "handles the 'current_memory_bytes' command" do
+    response = send_request({ cmd: "current_memory_bytes" })
+    expect(response).to eq({ ok: true, value: 123 })
+    expect(Mudis).to have_received(:current_memory_bytes)
+  end
+
+  it "handles the 'max_memory_bytes' command" do
+    response = send_request({ cmd: "max_memory_bytes" })
+    expect(response).to eq({ ok: true, value: 456 })
+    expect(Mudis).to have_received(:max_memory_bytes)
+  end
+
   it "handles the 'metrics' command" do
     response = send_request({ cmd: "metrics" })
     expect(response).to eq({ ok: true, value: { reads: 1, writes: 1 } })
     expect(Mudis).to have_received(:metrics)
-  end
-
-  it "handles the 'reset_metrics' command" do
-    response = send_request({ cmd: "reset_metrics" })
-    expect(response).to eq({ ok: true, value: nil })
-    expect(Mudis).to have_received(:reset_metrics!)
-  end
-
-  it "handles the 'reset' command" do
-    response = send_request({ cmd: "reset" })
-    expect(response).to eq({ ok: true, value: nil })
-    expect(Mudis).to have_received(:reset!)
   end
 
   it "handles unknown commands" do

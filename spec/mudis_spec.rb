@@ -55,6 +55,19 @@ RSpec.describe Mudis do # rubocop:disable Metrics/BlockLength
       Mudis.update("counter") { |v| v + 1 }
       expect(Mudis.read("counter")).to eq(6)
     end
+
+    it "refreshes TTL based on original duration" do
+      Mudis.write("ttl_key", "v", expires_in: 2)
+      meta_before = Mudis.inspect("ttl_key")
+      original_ttl = meta_before[:expires_at] - meta_before[:created_at]
+
+      sleep 1
+      Mudis.update("ttl_key") { |v| v }
+      meta_after = Mudis.inspect("ttl_key")
+
+      expect(meta_after[:created_at]).to be > meta_before[:created_at]
+      expect(meta_after[:expires_at]).to be_within(0.5).of(Time.now + original_ttl)
+    end
   end
 
   describe ".fetch" do
@@ -75,6 +88,30 @@ RSpec.describe Mudis do # rubocop:disable Metrics/BlockLength
       Mudis.write("k", 100)
       result = Mudis.fetch("k", force: true) { 200 } # fix
       expect(result).to eq(200)
+    end
+
+    it "executes the block once with singleflight: true" do
+      Mudis.delete("sf")
+      count = 0
+      count_mutex = Mutex.new
+      results = []
+      results_mutex = Mutex.new
+
+      threads = 5.times.map do
+        Thread.new do
+          value = Mudis.fetch("sf", singleflight: true) do
+            count_mutex.synchronize { count += 1 }
+            sleep 0.05
+            "v"
+          end
+          results_mutex.synchronize { results << value }
+        end
+      end
+
+      threads.each(&:join)
+      expect(count).to eq(1)
+      expect(results).to all(eq("v"))
+      expect(Mudis.read("sf")).to eq("v")
     end
   end
 

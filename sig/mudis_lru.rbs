@@ -12,7 +12,7 @@ class Mudis
 
     def evict_key: (Integer, String) -> void
 
-    def insert_lru: (Integer, LRUNode) -> void
+    def insert_lru: (Integer, String) -> void
 
     def promote_lru: (Integer, String) -> void
 

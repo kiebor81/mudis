@@ -14,6 +14,7 @@ class Mudis
     attr_reader max_value_bytes : Integer?
     attr_accessor max_ttl: Integer?
     attr_accessor default_ttl: Integer?
+    attr_accessor eviction_threshold: Float?
     
     def configure: () { (config: MudisConfig) -> void } -> void
     def config: () -> MudisConfig
@@ -21,6 +22,13 @@ class Mudis
     def validate_config!: () -> void
 
     def buckets: () -> Integer
+
+    def bind: (
+      namespace: String,
+      ?default_ttl: Integer?,
+      ?max_ttl: Integer?,
+      ?max_value_bytes: Integer?
+    ) -> Mudis::Bound
   end
 
   # Lifecycle
@@ -39,17 +47,19 @@ class Mudis
     String,
     ?expires_in: Integer,
     ?force: bool,
-    ?namespace: String
+    ?namespace: String,
+    ?singleflight: bool
   ) { () -> untyped } -> untyped
 
   def self.clear: (String, ?namespace: String) -> void
   def self.replace: (String, untyped, ?expires_in: Integer, ?namespace: String) -> void
   def self.inspect: (String, ?namespace: String) -> Hash[Symbol, untyped]?
-  def self.keys: (?namespace: String) -> Array[String]
-  def self.clear_namespace: (?namespace: String) -> void
+  def self.keys: (namespace: String) -> Array[String]
+  def self.clear_namespace: (namespace: String) -> void
+  def self.with_namespace: (namespace: String) { () -> untyped } -> untyped
 
   # Introspection & management
-  def self.metrics: () -> Hash[Symbol, untyped]
+  def self.metrics: (?namespace: String) -> Hash[Symbol, untyped]
   def self.cleanup_expired!: () -> void
   def self.all_keys: () -> Array[String]
   def self.current_memory_bytes: () -> Integer
@@ -59,4 +69,9 @@ class Mudis
   # State reset
   def self.reset!: () -> void
   def self.reset_metrics!: () -> void
+
+  # Persistence
+  def self.save_snapshot!: () -> void
+  def self.load_snapshot!: () -> void
+  def self.install_persistence_hook!: () -> void
 end

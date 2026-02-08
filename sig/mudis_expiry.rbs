@@ -8,6 +8,6 @@ class Mudis
 
     private
 
-    def effective_ttl: (?expires_in: Integer?) -> Integer?
+    def effective_ttl: (Integer?) -> Integer?
   end
 end

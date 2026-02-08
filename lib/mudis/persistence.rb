@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "fileutils"
+
 class Mudis
   # Persistence module handles snapshot save/load operations for warm boot support
   module Persistence
@@ -80,7 +82,7 @@ class Mudis
     def safe_write_snapshot(data) # rubocop:disable Metrics/MethodLength
       path = @persistence_path
       dir = File.dirname(path)
-      Dir.mkdir(dir) unless Dir.exist?(dir)
+      FileUtils.mkdir_p(dir) unless Dir.exist?(dir)
 
       payload =
         if (@persistence_format || :marshal).to_sym == :json
