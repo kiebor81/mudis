@@ -906,7 +906,7 @@ _10000 iterations of 512KB, JSON, compression ON_
 
 ### Minimal Setup
 
-A simple [Mudis Web Cache](https://github.com/kiebor81/mudis-web-cache) project exists for quick drop-in.
+A simple [Mudis Web Cache](https://github.com/kiebor81/mudis-web-cache) project exists for quick drop-in and extension.
 
 The information below is for if you want to build your own in your chosen framework.
 
