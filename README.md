@@ -799,7 +799,7 @@ _10000 iterations of 512KB, JSON, compression ON_
 ## Known Limitations
 
 - Data is **non-persistent**; only soft-persistence is optionally provided.
-- No SQL or equivallent query interface for cached data. Data is per Key retrieval only (see [Mudis-QL](https://github.com/kiebor81/mudis-ql)).
+- No SQL or equivallent query interface for cached data. Data is per Key retrieval only (see [Mudis-QL](https://github.com/kiebor81/mudis-ql) if you need this functionality).
 - Compression introduces CPU overhead.
 
 ---
@@ -807,6 +807,10 @@ _10000 iterations of 512KB, JSON, compression ON_
 ## Create a Mudis Web Cache Server
 
 ### Minimal Setup
+
+A simple [Mudis Web Cache](https://github.com/kiebor81/mudis-web-cache) project exists for quick drop-in.
+
+The infomration below is for if you want to build your own in your chosen framework.
 
 #### Example using Rails
 
